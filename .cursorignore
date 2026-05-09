@@ -1,0 +1,32 @@
+
+
+
+# 排除大數據與模型目錄
+data/
+models/
+huggingface/
+*.safetensors
+*.bin
+*.gguf
+
+# 排除備份與日誌
+*.bak*
+*.log
+*.err
+logs/
+
+# 排除虛擬環境
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+
+# 排除 Docker 臨時檔案
+docker-compose.override.yml
+.dockerignore
+
+# 排除系統檔案
+.DS_Store
+Thumbs.db

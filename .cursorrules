@@ -1,0 +1,148 @@
+
+def log_gpu_state():
+    try:
+        pynvml.nvmlInit()
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        logger.error(f"GPU Memory: {mem_info.used/1024**3:.1f}GB / {mem_info.total/1024**3:.1f}GB")
+    except Exception as e:
+        logger.error(f"Failed to get GPU state: {e}")
+```
+
+## 4. 教義邊界與審核標準
+
+### 禁用來源 (黑名單)
+- **附佛外道**: 真佛宗、盧勝彥、一貫道、法輪功
+- **民間信仰**: 符咒、降頭、靈媒、通靈
+- **新興宗教**: 創價學會、統一教
+
+### 權威來源 (白名單)
+- **譯經大師**: 法尊法師、索達吉堪布、宗薩欽哲仁波切
+- **經典依據**: 《大藏經》、《丹珠爾》、《甘珠爾》
+- **學術機構**: CBETA (中華電子佛典協會)、84000 Translating the Words of the Buddha
+
+### 審核流程
+1. Qwen 初譯 (Worker) → 純語言轉換
+2. Hermes 審核 (Manager) → 教義檢查 + 結構化輸出
+3. 輸出格式: JSON `{"original": str, "translation": str, "approved": bool, "issues": list}`
+
+## 5. 開發工作流程
+
+### 文件結構
+```
+/opt/vajra/
+├── .cursorignore
+├── .cursorrules
+├── vajra_agent.py      # 主程式
+├── docker-compose.yml  # vLLM 配置
+├── logs/               # 日誌目錄
+└── data/               # 資料目錄
+```
+
+### 測試要求
+- 每個異步函數必須有對應的 pytest 測試
+- 使用 `pytest-asyncio` 進行異步測試
+- Mock 外部 API 調用 (`pytest-mock` 或 `respx`)
+
+### 性能基準
+- 單次翻譯延遲 (TTFT): < 3 秒
+- 吞吐量 (TPS): > 20 tokens/s
+- 並發請求: 最多 2 個同時進行
+
+## 6. 禁止事項
+
+### 絕對禁止
+- ❌ 使用同步 HTTP 庫 (requests, urllib)
+- ❌ 無限重試或沒有退避的重試
+- ❌ 硬編碼 API 端點 (必須使用環境變數或配置檔)
+- ❌ 在主執行緒中運行阻塞操作
+- ❌ 忽略異常或使用空 except 區塊
+- ❌ 生成會掃描大型目錄的代碼 (data/, models/)
+
+### 資源限制
+- 單個請求不得超過 16384 tokens (模型硬限制)
+- 不得同時運行超過 2 個並發請求
+- 不得在背景啟動未受監控的長時間任務
+
+## 7. Cursor 特定指令
+
+當我要求 Cursor 生成代碼時:
+1. **優先閱讀 .cursorrules**
+2. **檢查現有的 vajra_agent.py 結構**
+3. **遵循上述所有約束**
+4. **生成完整的類型提示 (Type Hints)**
+5. **包含完整的錯誤處理**
+6. **添加 docstring 說明函數用途**
+
+---
+
+**本規則由 CFO (Chief Financial Officer of Compute) 審核通過**  
+**最後更新**: 2026-05-07 01:34 HKT  
+**基於實際驗證的系統狀態**: nvidia-smi 2026-05-06 19:10  
+# Vajra Project 核心開發規則
+
+## 1. 物理邊界 (DGX Spark GB10)
+- **GPU**: NVIDIA GB10, 128 GB VRAM
+- **雙模型佔用** (已驗證):
+  - Qwen-36B (PID 285823): 48004 MiB (46.9 GB)
+  - Hermes-36B (PID 289865): 43119 MiB (42.1 GB)
+  - 總計: 89.0 GB / 128 GB (70% 使用率)
+  - 剩餘緩衝區: 37.8 GB
+- **系統 RAM**: 83% 佔用率，嚴禁生成會導致全盤掃描或阻塞 I/O 的同步代碼
+- **gpu_memory_utilization**: 0.45 (已驗證配置)
+
+## 2. API 端點拓撲 (本地 vLLM)
+- **Worker (初譯/感知)**: `http://127.0.0.1:8000/v1/chat/completions`
+  - Model: `qwen-36b`
+  - Temperature: 0.1
+  - max_tokens: ≤2048 (短文本翻譯)
+  - max_model_len: 16384 (已驗證上限)
+
+- **Manager (審核/決策)**: `http://127.0.0.1:8001/v1/chat/completions`
+  - Model: `hermes-36b`
+  - Temperature: 0.2
+  - max_tokens: ≤4096 (審核與結構化輸出)
+  - max_model_len: 16384 (已驗證上限)
+  - quantization: compressed-tensors (已驗證)
+  - kv_cache_dtype: fp8 (已驗證)
+
+## 3. 代碼規範鐵律
+
+### 異步架構 (強制)
+- **HTTP 請求**: 必須使用 `httpx.AsyncClient` 或 `aiohttp.ClientSession`
+- **並發控制**: 必須實作 `asyncio.Semaphore(2)` 控制最大並發請求
+- **Never use**: `requests` 同步庫, `urllib`, 或任何阻塞式 HTTP 客戶端
+
+### 錯誤處理 (強制)
+- **重試邏輯**: 必須使用 `tenacity` 裝飾器
+  - 策略: 指數退避 (exponential backoff)
+  - 最大重試次數: 3
+  - 基礎延遲: 2 秒
+  - 最大延遲: 10 秒
+
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=10)
+)
+async def api_call():
+    pass
+```
+
+### 日誌與監控 (強制)
+- **棄用 print()**: 所有輸出必須使用 `logging` 模組
+- **日誌層級**:
+  - INFO: 成功的請求與正常流程
+  - WARNING: 重試事件
+  - ERROR: 失敗請求 + GPU 狀態
+- **GPU 監控**: 錯誤時必須記錄 GPU 狀態
+  - 優先使用 `pynvml` (Python NVML bindings)
+  - 備選方案: `subprocess.run(['nvidia-smi'])`
+
+```python
+import logging
+import pynvml
+
+logger = logging.getLogger(__name__)

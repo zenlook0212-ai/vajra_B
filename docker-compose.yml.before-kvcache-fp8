@@ -1,0 +1,58 @@
+services:
+  qwen-36b-inference:
+    image: vllm/vllm-openai:latest
+    container_name: vajra-qwen-36b
+    runtime: nvidia
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - /data/models:/data/models:ro
+      - /data/huggingface:/data/huggingface
+    environment:
+      - HF_HOME=/data/huggingface/cache
+    command:
+      - /data/models/Qwen3.6-35B-A3B-FP8
+      - --served-model-name
+      - qwen-36b
+      - --max-model-len
+      - "16384"
+      - --gpu-memory-utilization
+      - "0.45"
+      - --quantization
+      - fp8
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --trust-remote-code
+    ipc: host
+
+  hermes-36b-decision:
+    image: vllm/vllm-openai:latest
+    container_name: vajra-hermes-36b
+    runtime: nvidia
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - /data/models:/data/models:ro
+      - /data/huggingface:/data/huggingface
+    environment:
+      - HF_HOME=/data/huggingface/cache
+    command:
+      - /data/models/Hermes-4.3-36B-FP8
+      - --served-model-name
+      - hermes-36b
+      - --max-model-len
+      - "16384"
+      - --gpu-memory-utilization
+      - "0.45"
+      - --quantization
+      - compressed-tensors
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8001"
+      - --trust-remote-code
+    ipc: host
