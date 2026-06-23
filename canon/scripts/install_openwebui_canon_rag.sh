@@ -22,6 +22,10 @@ docker cp "$SCRIPT_DIR/openwebui_canon_rag.py" "$CONTAINER:/tmp/openwebui_canon_
 docker cp "$SCRIPT_DIR/openwebui_install_tool.py" "$CONTAINER:/tmp/openwebui_install_tool.py"
 docker exec -e VAJRA_GATEWAY_URL="$GATEWAY_URL" "$CONTAINER" python3 /tmp/openwebui_install_tool.py
 
+echo "== configure qwen35b (disable thinking) =="
+docker cp "$SCRIPT_DIR/openwebui_configure_qwen.py" "$CONTAINER:/tmp/openwebui_configure_qwen.py"
+docker exec "$CONTAINER" python3 /tmp/openwebui_configure_qwen.py
+
 echo "== smoke from container =="
 docker exec "$CONTAINER" curl -sf -m 30 "${GATEWAY_URL}/v1/modes" | head -c 120
 echo
