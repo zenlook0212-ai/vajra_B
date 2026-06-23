@@ -33,7 +33,7 @@ class Tools:
             f"{GATEWAY}/v1/task",
             json={
                 "mode": "canon_rag",
-                "channel": "web_public_hermes",
+                "channel": "web",
                 "message": question,
             },
             timeout=300,

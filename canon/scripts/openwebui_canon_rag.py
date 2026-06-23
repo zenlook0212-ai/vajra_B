@@ -5,7 +5,7 @@ Copy to Open WebUI Admin → Functions, or mount this file.
 import os
 import requests
 
-GATEWAY = os.environ.get("VAJRA_GATEWAY_URL", "http://127.0.0.1:8080")
+GATEWAY = os.environ.get("VAJRA_GATEWAY_URL", "http://127.0.0.1:8081")
 
 
 class Tools:
@@ -15,7 +15,7 @@ class Tools:
             f"{GATEWAY}/v1/task",
             json={
                 "mode": "canon_rag",
-                "channel": "web_public_hermes",
+                "channel": "web",
                 "message": question,
             },
             timeout=300,

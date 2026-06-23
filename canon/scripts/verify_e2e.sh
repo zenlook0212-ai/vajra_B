@@ -40,9 +40,9 @@ PY
 
 if curl -sf "${GW}/v1/modes" >/dev/null 2>&1; then
   echo "== gateway canon_rag (needs qwen :8003) =="
-  if curl -sf -X POST "${GW}/v1/task" \
+  if curl -sf -m 180 -X POST "${GW}/v1/task" \
     -H 'Content-Type: application/json' \
-    -d '{"mode":"canon_rag","channel":"web_public_hermes","message":"心經如何說色與空？"}' \
+    -d '{"mode":"canon_rag","channel":"web","message":"心經如何說色與空？"}' \
     | head -c 500; then
     echo
   else
