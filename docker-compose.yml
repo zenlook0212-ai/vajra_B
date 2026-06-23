@@ -87,6 +87,9 @@ services:
       - "--port"
       - "8000"
       - "--trust-remote-code"
+      - "--enable-auto-tool-choice"
+      - "--tool-call-parser"
+      - "hermes"
     ipc: host
     deploy:
       resources:
