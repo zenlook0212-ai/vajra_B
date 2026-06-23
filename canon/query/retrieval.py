@@ -57,6 +57,32 @@ def _matches_doctrine_prefixes(canon_id: str, prefixes: list[str]) -> bool:
     return False
 
 
+def _volume_from_canon(canon_id: str) -> int | None:
+    cid = canon_id.upper()
+    if not cid.startswith("T") or len(cid) < 3:
+        return None
+    vol = cid[1:3]
+    return int(vol) if vol.isdigit() else None
+
+
+def _rrf_doctrine_multiplier(
+    canon_id: str,
+    doctrine_boost_prefixes: list[str] | None,
+) -> float:
+    """Tiered boost for expected sutra families; demote non-target corpora on D-class."""
+    if not doctrine_boost_prefixes:
+        return 1.0
+    cid = canon_id.upper()
+    for i, p in enumerate(doctrine_boost_prefixes):
+        if cid.startswith(p.upper()):
+            if i == 0:
+                return 2.0
+            if i == 1:
+                return 1.75
+            return 1.55
+    return 0.18
+
+
 def rrf_fuse(
     vec_ranks: dict[int, int],
     bm25_ranks: dict[int, int],
@@ -80,12 +106,11 @@ def rrf_fuse(
         if extra_rank_lists:
             for rl in extra_rank_lists:
                 s += rrf_score(rl.get(cid, k + 1), k)
-        if _canon_id_match(query, chunk_canon.get(cid, "")):
+        chunk_id = chunk_canon.get(cid, "")
+        if _canon_id_match(query, chunk_id):
             s *= canon_bonus
-        elif doctrine_boost_prefixes and _matches_doctrine_prefixes(
-            chunk_canon.get(cid, ""), doctrine_boost_prefixes
-        ):
-            s *= doctrine_bonus
+        elif doctrine_boost_prefixes:
+            s *= _rrf_doctrine_multiplier(chunk_id, doctrine_boost_prefixes)
         scores[cid] = s
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     return ranked[:limit]
@@ -268,6 +293,9 @@ def hybrid_search(
 
     sub_rank_lists: list[dict[int, int]] = []
     sub_hits: list[dict[str, Any]] = []
+    kw_prefixes = prefixes
+    if not kw_prefixes and doctrine_boost_prefixes:
+        kw_prefixes = doctrine_boost_prefixes
     if sub_terms:
         for term in sub_terms:
             hits = keyword_search(
@@ -275,7 +303,7 @@ def hybrid_search(
                 term,
                 series=series,
                 limit=sub_term_bm25_top,
-                canon_prefixes=prefixes,
+                canon_prefixes=kw_prefixes,
             )
             sub_hits.extend(hits)
             sub_rank_lists.append({h["id"]: i + 1 for i, h in enumerate(hits)})
@@ -288,7 +316,9 @@ def hybrid_search(
         sub_hits = []
         if sub_terms:
             for term in sub_terms:
-                hits = keyword_search(conn, term, series=series, limit=sub_term_bm25_top)
+                hits = keyword_search(
+                    conn, term, series=series, limit=sub_term_bm25_top, canon_prefixes=kw_prefixes
+                )
                 sub_hits.extend(hits)
                 sub_rank_lists.append({h["id"]: i + 1 for i, h in enumerate(hits)})
         all_hits = vec_hits + bm25_hits + sub_hits

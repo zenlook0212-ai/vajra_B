@@ -50,18 +50,34 @@ def expand_doctrine_terms(query: str) -> list[str]:
             if _CJK_RE.search(alt) and alt not in terms:
                 terms.append(alt)
 
-    # 阿含系開放題：補一條部類檢索詞（緣起/四諦等基礎教義）
-    if any(t in q for t in ("緣起", "十二因緣", "四諦", "八正道", "無常", "無我", "涅槃")):
+    # 阿含系開放題：補部類與常用經名檢索詞
+    _agama_doctrines = (
+        "緣起", "十二因緣", "四諦", "八正道", "無常", "無我", "涅槃", "中道", "阿羅漢",
+    )
+    if any(t in q for t in _agama_doctrines):
         if "阿含" not in terms:
             terms.append("阿含")
+        for extra in ("長阿含經", "中阿含經", "雜阿含經", "增一阿含經"):
+            if extra not in terms:
+                terms.append(extra)
+
+    if "菩提心" in q or ("菩提" in q and "菩提心" not in q):
+        for extra in ("法華經", "華嚴經", "發菩提心", "願成佛", "菩薩發心"):
+            if extra not in terms:
+                terms.append(extra)
+
+    if "無我" in q:
+        for extra in ("阿含", "五蘊", "色受想行識", "非我", "金剛經"):
+            if extra not in terms:
+                terms.append(extra)
 
     if "淨土" in q:
-        for extra in ("阿彌陀經", "極樂世界", "無量壽"):
+        for extra in ("阿彌陀經", "極樂世界", "無量壽", "無量壽經", "觀無量壽經", "念佛", "西方極樂"):
             if extra not in terms:
                 terms.append(extra)
 
     if "戒律" in q or "戒" in q:
-        for extra in ("波羅提木叉", "戒經", "比丘戒"):
+        for extra in ("波羅提木叉", "戒經", "比丘戒", "摩訶僧祇律", "四分律", "十誦律", "僧祇律"):
             if extra not in terms:
                 terms.append(extra)
 
@@ -77,6 +93,11 @@ def expand_doctrine_terms(query: str) -> list[str]:
 
     if "緣起" in q and "因緣" not in terms:
         terms.append("因緣")
+
+    if "中道" in q:
+        for extra in ("八正道", "正見", "中阿含經"):
+            if extra not in terms:
+                terms.append(extra)
 
     if not terms:
         stripped = _strip_filler(q)
