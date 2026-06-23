@@ -1,3 +1,15 @@
+# Qwen 文字推理：
+# - qwen35b-inference：閘道 ``models.yaml`` 預設 ``qwen`` → **8003**（Huihui-Qwen3.6-27B NVFP4 MTP，`served-model-name=qwen35b`）。
+# - qwen-36b-inference：**8000**，Qwen3-Coder-30B-A3B FP8（Claude Code / agentic coding）
+# 若本機已有同名容器 ``qwen35b-vllm``（先前 docker run），請先 ``docker stop/rm`` 再用 compose，以免名稱/埠衝突。
+# Hermes（審核）：此 compose 提供 Hermes-3-Llama-3.1-8B（8002），供 deep_think 與可選審核路徑使用。
+#
+# Canon RAG（方案 B）：PostgreSQL+pgvector（5433）+ Qwen3-Embedding-4B（8005）。
+#   VAJRA_CANON_PG_DSN=postgresql://vajra:vajra@127.0.0.1:5433/canon
+#   docker compose up -d postgres qwen3-embed
+# mxbai rerank（8007）：W3 hybrid 重排；CPU 友好。
+# Chroma（8040）：已棄用；保留容器定義供舊資料遷移參考，閘道不再使用。
+# shell 請勿使用角括號 placeholder（如 YOUR_PORT）；「<」「>」会被 bash 當輸入重定向。
 services:
   qwen-36b-inference:
     image: vllm/vllm-openai:latest
@@ -7,21 +19,67 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - /data/models/Qwen3-Coder-30B-A3B-Instruct-FP8:/model:ro
+      - /data/huggingface:/data/huggingface
+      - /opt/vajra/patches/vllm-anthropic/protocol.py:/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/protocol.py:ro
+      - /opt/vajra/patches/vllm-anthropic/serving.py:/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/anthropic/serving.py:ro
+    environment:
+      - HF_HOME=/data/huggingface/cache
+    command:
+      - "--model"
+      - "/model"
+      - "--served-model-name"
+      - "qwen-coder"
+      - "--quantization"
+      - "fp8"
+      - "--kv-cache-dtype"
+      - "fp8"
+      - "--max-model-len"
+      - "65536"
+      - "--gpu-memory-utilization"
+      - "0.88"
+      - "--attention-backend"
+      - "TRITON_ATTN"
+      - "--enable-auto-tool-choice"
+      - "--tool-call-parser"
+      - "qwen3_coder"
+      - "--trust-remote-code"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  qwen35b-inference:
+    image: vllm/vllm-openai:latest
+    container_name: qwen35b-vllm
+    runtime: nvidia
+    restart: unless-stopped
+    ports:
+      - "8003:8000"
+    volumes:
       - /data/models:/data/models:ro
       - /data/huggingface:/data/huggingface
     environment:
       - HF_HOME=/data/huggingface/cache
     command:
       - "--model"
-      - "/data/models/Qwen3.6-35B-A3B-FP8"
+      - "/data/models/Huihui-Qwen3.6-27B-abliterated-NVFP4-MTP"
       - "--served-model-name"
-      - "qwen-36b"
+      - "qwen35b"
       - "--max-model-len"
-      - "16384"
+      - "8192"
       - "--gpu-memory-utilization"
-      - "0.45"
-      - "--quantization"
-      - "fp8"
+      - "0.42"
+      - "--max-num-seqs"
+      - "128"
       - "--kv-cache-dtype"
       - "fp8"
       - "--host"
@@ -38,13 +96,13 @@ services:
               count: all
               capabilities: [gpu]
 
-  hermes-36b-decision:
+  hermes-8b-inference:
     image: vllm/vllm-openai:latest
-    container_name: vajra-hermes-36b
+    container_name: vajra-hermes-8b
     runtime: nvidia
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "8002:8000"
     volumes:
       - /data/models:/data/models:ro
       - /data/huggingface:/data/huggingface
@@ -52,21 +110,17 @@ services:
       - HF_HOME=/data/huggingface/cache
     command:
       - "--model"
-      - "/data/models/Hermes-4.3-36B-FP8"
+      - "/data/models/Hermes-3-Llama-3.1-8B"
       - "--served-model-name"
-      - "hermes-36b"
+      - "/data/models/Hermes-3-Llama-3.1-8B"
       - "--max-model-len"
       - "16384"
       - "--gpu-memory-utilization"
-      - "0.45"
-      - "--quantization"
-      - "compressed-tensors"
-      - "--kv-cache-dtype"
-      - "fp8"
+      - "0.35"
       - "--host"
       - "0.0.0.0"
       - "--port"
-      - "8001"
+      - "8000"
       - "--trust-remote-code"
     ipc: host
     deploy:
@@ -76,3 +130,61 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: vajra-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: vajra
+      POSTGRES_PASSWORD: vajra
+      POSTGRES_DB: canon
+    volumes:
+      - vajra_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vajra -d canon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qwen3-embed:
+    build:
+      context: ./canon/services/embed
+    container_name: vajra-qwen3-embed
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    environment:
+      EMBED_MODEL: /data/models/Qwen3-Embedding-4B
+      VAJRA_CANON_EMBED_DIM: "2048"
+    volumes:
+      - /data/models/Qwen3-Embedding-4B:/data/models/Qwen3-Embedding-4B:ro
+
+  mxbai-rerank:
+    build:
+      context: ./canon/services/rerank
+    container_name: vajra-mxbai-rerank
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    environment:
+      HF_HOME: /data/huggingface/cache
+    volumes:
+      - /data/huggingface:/data/huggingface
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: vajra-chromadb
+    restart: unless-stopped
+    profiles:
+      - legacy
+    ports:
+      - "8040:8000"
+    volumes:
+      - vajra_chroma_data:/chroma/chroma
+
+volumes:
+  vajra_chroma_data:
+  vajra_pg_data:
