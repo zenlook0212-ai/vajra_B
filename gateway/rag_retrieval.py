@@ -286,6 +286,27 @@ def order_snippets_by_distance(snippets: list[dict[str, Any]]) -> list[dict[str,
     return sorted(snippets, key=dist_key)
 
 
+def prioritize_scoped_canon_snippets(
+    snippets: list[dict[str, Any]],
+    canon_prefixes: list[str] | None,
+) -> list[dict[str, Any]]:
+    """For A/C scoped queries, surface primary canon chunks before commentary."""
+    if not snippets or not canon_prefixes:
+        return snippets
+    prefixes = [p.upper() for p in canon_prefixes if p]
+    if not prefixes:
+        return snippets
+
+    def matches(sn: dict[str, Any]) -> bool:
+        meta = sn.get("metadata") if isinstance(sn.get("metadata"), dict) else {}
+        cid = str((meta or {}).get("canon_id") or sn.get("canon_id") or "").upper()
+        return any(cid.startswith(p) for p in prefixes)
+
+    primary = [sn for sn in snippets if matches(sn)]
+    secondary = [sn for sn in snippets if sn not in primary]
+    return primary + secondary
+
+
 def rag_synth_profile(user_message: str) -> str:
     """Heuristic expert route for RAG synthesizer (system prompt + temperature)."""
     msg = user_message.strip()

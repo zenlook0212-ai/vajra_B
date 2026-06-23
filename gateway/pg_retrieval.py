@@ -36,7 +36,9 @@ def _hybrid_sync(
 
         series_hint = pq.series_hint or series
         with psycopg.connect(pg_dsn()) as conn:
-            cached = lookup_cache(conn, pq.original, embedding)
+            cached = lookup_cache(
+                conn, pq.original, embedding, canon_prefixes=pq.canon_prefixes or None
+            )
             if cached and cached.get("answer"):
                 chunks = cached.get("top_chunks") or []
                 if isinstance(chunks, list) and chunks:

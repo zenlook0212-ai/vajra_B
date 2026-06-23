@@ -999,6 +999,9 @@ def create_app() -> FastAPI:
                 )
 
             snippets = rag_retrieval.order_snippets_by_distance(snippets)
+            snippets = rag_retrieval.prioritize_scoped_canon_snippets(
+                snippets, pq.canon_prefixes
+            )
             similar_links = rag_retrieval.extract_similar_sutra_links(snippets)
 
             if snippets:

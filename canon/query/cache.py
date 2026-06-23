@@ -29,10 +29,41 @@ def _query_hash(query: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _chunk_canon_id(chunk: dict[str, Any]) -> str:
+    meta = chunk.get("metadata")
+    if isinstance(meta, dict) and meta.get("canon_id"):
+        return str(meta["canon_id"]).upper()
+    if chunk.get("canon_id"):
+        return str(chunk["canon_id"]).upper()
+    return ""
+
+
+def cache_matches_scope(
+    top_chunks: list[dict[str, Any]],
+    canon_prefixes: list[str] | None,
+) -> bool:
+    """Reject scoped-query cache hits that lack primary canon evidence."""
+    if not canon_prefixes:
+        return True
+    prefixes = [p.upper() for p in canon_prefixes if p]
+    if not prefixes:
+        return True
+    ids = [_chunk_canon_id(ch) for ch in top_chunks if isinstance(ch, dict)]
+    ids = [cid for cid in ids if cid]
+    if not ids:
+        return False
+    if len(prefixes) == 1:
+        p = prefixes[0]
+        return any(cid.startswith(p) for cid in ids[:3])
+    return any(any(cid.startswith(p) for p in prefixes) for cid in ids[:3])
+
+
 def lookup_cache(
     conn: psycopg.Connection,
     query: str,
     query_embed: list[float],
+    *,
+    canon_prefixes: list[str] | None = None,
 ) -> dict[str, Any] | None:
     qh = _query_hash(query)
     emb_lit = "[" + ",".join(str(float(x)) for x in query_embed) + "]"
@@ -56,6 +87,8 @@ def lookup_cache(
         return None
     top_chunks = row[1]
     if not isinstance(top_chunks, list) or len(top_chunks) < MIN_CACHE_CHUNKS:
+        return None
+    if not cache_matches_scope(top_chunks, canon_prefixes):
         return None
     return {
         "query_hash": row[0],
