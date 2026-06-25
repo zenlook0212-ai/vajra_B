@@ -1,6 +1,6 @@
 """Tests for faithfulness scoring."""
 
-from canon.eval.faithfulness import score_faithfulness_rules
+from canon.eval.faithfulness import faithfulness_pass, score_faithfulness_rules
 
 
 def test_faithfulness_high_overlap():
@@ -21,3 +21,15 @@ def test_faithfulness_detects_unsupported():
     assert out["faithfulness"] is not None
     assert out["faithfulness"] < 0.5
     assert out["unsupported_sentences"]
+
+
+def test_faithfulness_conservative_refusal_scores_one():
+    answer = "現有語料不足以確認此問題的完整答案。"
+    out = score_faithfulness_rules(answer, [])
+    assert out["faithfulness"] == 1.0
+    assert faithfulness_pass(out, answer=answer)
+
+
+def test_faithfulness_pass_none_without_refusal():
+    out = {"faithfulness": None}
+    assert not faithfulness_pass(out, answer="一般回答但無引用。")

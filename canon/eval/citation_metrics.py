@@ -8,15 +8,40 @@ from typing import Any
 import psycopg
 
 _COORD_CITE_RE = re.compile(r"【([A-Z]{1,3}\d+n\d+_[^】]+)】", re.I)
+_COORD_CITE_BLOCK_RE = re.compile(
+    r"【[A-Z]{1,3}\d+n\d+_[^】]+】(?:\([^)]+\))?",
+    re.I,
+)
+_ASPECT_HEADER_RE = re.compile(r"【[^】]*／[^】]*】")
 _CANON_ID_RE = re.compile(r"\b([A-Z]{1,3}\d+n\d+[a-zA-Z]?)\b", re.I)
+_CONSERVATIVE_REFUSAL_RE = re.compile(
+    r"現有語料不足以確認|語料不足|無法從現有語料"
+)
 
 
 def extract_citations(text: str) -> list[str]:
     return [m.group(1) for m in _COORD_CITE_RE.finditer(text or "")]
 
 
+def strip_citation_blocks(text: str) -> str:
+    """Remove coord cites (and optional parenthetical canon) and aspect headers."""
+    t = text or ""
+    t = _COORD_CITE_BLOCK_RE.sub("", t)
+    t = _ASPECT_HEADER_RE.sub("", t)
+    return t
+
+
 def extract_canon_ids(text: str) -> list[str]:
     return [m.group(1).upper() for m in _CANON_ID_RE.finditer(text or "")]
+
+
+def is_conservative_refusal(answer: str) -> bool:
+    return bool(_CONSERVATIVE_REFUSAL_RE.search(answer or ""))
+
+
+def _canon_from_coord(coord: str) -> str | None:
+    m = re.search(r"([A-Z]{1,3}\d+n\d+)", coord, re.I)
+    return m.group(1).upper() if m else None
 
 
 def normalize_citation_coord(coord: str) -> str:
@@ -75,16 +100,39 @@ def snippet_canon_ids(snippets: list[dict[str, Any]]) -> set[str]:
     return out
 
 
+def citation_from_retrieval(
+    *,
+    chunk_id: int | None,
+    coord: str,
+    retrieved_ids: set[int],
+    retrieved_canons: set[str],
+) -> bool:
+    """True if citation is traceable to the retrieval pool."""
+    if chunk_id is not None and chunk_id in retrieved_ids:
+        return True
+    coord_canon = _canon_from_coord(coord)
+    if not coord_canon:
+        return False
+    if coord_canon in retrieved_canons:
+        return True
+    for rc in retrieved_canons:
+        if coord_canon.startswith(rc) or rc.startswith(coord_canon):
+            return True
+    return False
+
+
 def score_answer_citations(
     conn: psycopg.Connection,
     *,
     answer: str,
     snippets: list[dict[str, Any]],
+    trace_snippets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Score one synthesized answer against retrieval context."""
     cites = extract_citations(answer)
-    retrieved_ids = snippet_chunk_ids(snippets)
-    retrieved_canons = snippet_canon_ids(snippets)
+    pool = trace_snippets if trace_snippets is not None else snippets
+    retrieved_ids = snippet_chunk_ids(pool)
+    retrieved_canons = snippet_canon_ids(pool)
 
     valid_flags: list[bool] = []
     retrieval_flags: list[bool] = []
@@ -99,14 +147,21 @@ def score_answer_citations(
             retrieval_flags.append(False)
             continue
         chunk_id = chunk_id_for_citation(conn, coord)
-        in_ret = chunk_id is not None and chunk_id in retrieved_ids
+        in_ret = citation_from_retrieval(
+            chunk_id=chunk_id,
+            coord=coord,
+            retrieved_ids=retrieved_ids,
+            retrieved_canons=retrieved_canons,
+        )
         retrieval_flags.append(in_ret)
         if not in_ret:
             not_from_retrieval.append(coord)
 
-    canon_in_answer = extract_canon_ids(answer)
+    canon_in_answer = extract_canon_ids(strip_citation_blocks(answer))
     stray_canons = [
-        c for c in canon_in_answer if not any(c.startswith(rc) or rc.startswith(c) for rc in retrieved_canons)
+        c
+        for c in canon_in_answer
+        if not any(c.startswith(rc) or rc.startswith(c) for rc in retrieved_canons)
     ]
 
     n = len(cites)

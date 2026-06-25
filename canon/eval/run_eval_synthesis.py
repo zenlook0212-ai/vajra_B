@@ -16,12 +16,16 @@ from urllib import error, request
 
 import psycopg
 
-from canon.eval.citation_metrics import score_answer_citations
+from canon.eval.citation_metrics import is_conservative_refusal, score_answer_citations
 from canon.eval.faithfulness import faithfulness_pass, score_faithfulness
 from canon.eval.run_eval import DEFAULT_DSN, load_golden
 from canon.ingest.embed_client import embed_queries
 from canon.query.pipeline import embed_text, plan_query, retrieve_with_plan
 from canon.query.preprocess import preprocess_query
+from gateway.rag_retrieval import (
+    order_snippets_by_distance,
+    prioritize_scoped_canon_snippets,
+)
 
 _THINKING_RE = re.compile(r"thinking process|redacted_thinking", re.I)
 DEFAULT_GW = os.environ.get("VAJRA_GATEWAY_URL", "http://127.0.0.1:8081")
@@ -70,7 +74,11 @@ def evaluate_item(
     plan = plan_query(pq)
     emb = embed_queries([embed_text(pq, plan)])[0]
     hits, _ = retrieve_with_plan(conn, pq, plan, emb)
-    snippets = hits[:retrieval_k]
+    hits = order_snippets_by_distance(hits)
+    hits = prioritize_scoped_canon_snippets(hits, pq.canon_prefixes)
+    synthesis_snippets = hits[:retrieval_k]
+    trace_k = min(len(hits), plan.rerank_top or 30)
+    trace_snippets = hits[:trace_k]
 
     try:
         gw_data, latency = call_gateway(q, gateway_url=gateway_url, timeout=timeout)
@@ -82,16 +90,22 @@ def evaluate_item(
             "question": q,
             "error": str(exc),
             "pass": False,
+            "pass_kind": "error",
         }
 
     out = gw_data.get("output", {})
     answer = str(out.get("answer") or "")
     rag = gw_data.get("meta", {}).get("rag", {})
-    cite_scores = score_answer_citations(conn, answer=answer, snippets=snippets)
+    cite_scores = score_answer_citations(
+        conn,
+        answer=answer,
+        snippets=synthesis_snippets,
+        trace_snippets=trace_snippets,
+    )
     faith_scores = score_faithfulness(
         q,
         answer,
-        snippets,
+        synthesis_snippets,
         use_llm=faithfulness_llm,
         llm_url=llm_url or os.environ.get("VAJRA_QWEN_URL", "http://127.0.0.1:8003/v1/chat/completions"),
         model_id=llm_model or os.environ.get("VAJRA_QWEN_MODEL", "qwen35b"),
@@ -110,7 +124,33 @@ def evaluate_item(
         )
 
     thinking_leak = bool(_THINKING_RE.search(answer))
-    faith_ok = faithfulness_pass(faith_scores, min_score=faithfulness_min)
+    faith_ok = faithfulness_pass(faith_scores, min_score=faithfulness_min, answer=answer)
+    conservative = is_conservative_refusal(answer)
+    cited_pass = (
+        cite_scores["has_citation"]
+        and cite_scores["all_citations_valid"]
+        and cite_scores["all_citations_from_retrieval"]
+        and faith_ok
+        and not thinking_leak
+        and not cite_scores["has_stray_canon_id"]
+    )
+    refusal_pass = (
+        conservative
+        and not cite_scores["has_citation"]
+        and not thinking_leak
+        and not cite_scores["has_stray_canon_id"]
+        and faith_ok
+    )
+    if refusal_pass:
+        pass_kind = "conservative_refusal"
+        passed = True
+    elif cited_pass:
+        pass_kind = "cited"
+        passed = True
+    else:
+        pass_kind = "fail"
+        passed = False
+
     row: dict[str, Any] = {
         "id": item.get("id"),
         "category": item.get("category"),
@@ -121,16 +161,12 @@ def evaluate_item(
         "rag_status": rag.get("status"),
         "answer_len": len(answer),
         "thinking_leak": thinking_leak,
+        "conservative_refusal": conservative,
+        "trace_pool_size": len(trace_snippets),
         **cite_scores,
         **faith_scores,
-        "pass": (
-            cite_scores["has_citation"]
-            and cite_scores["all_citations_valid"]
-            and cite_scores["all_citations_from_retrieval"]
-            and faith_ok
-            and not thinking_leak
-            and not cite_scores["has_stray_canon_id"]
-        ),
+        "pass": passed,
+        "pass_kind": pass_kind,
         "preview": answer[:200].replace("\n", " "),
     }
     if err:

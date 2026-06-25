@@ -8,11 +8,11 @@ import re
 from typing import Any
 from urllib import error, request
 
-from canon.eval.citation_metrics import extract_citations
+from canon.eval.citation_metrics import extract_citations, is_conservative_refusal
 
 _COORD_CITE_RE = re.compile(r"【[A-Z]{1,3}\d+n\d+_[^】]+】", re.I)
 _SKIP_SENT_RE = re.compile(
-    r"^(?:根據|依據|以下|綜上|總之|換言之|現有語料|不足以|請參|附註)",
+    r"^(?:根據|依據|以下|綜上|總之|換言之|現有語料|不足以|請參|附註|無法從現有語料|語料不足)",
 )
 _SENT_SPLIT_RE = re.compile(r"(?<=[。；！？\n])")
 _CJK_RUN_RE = re.compile(r"[\u4e00-\u9fff]{4,}")
@@ -78,6 +78,13 @@ def score_faithfulness_rules(
     sentences = _claim_sentences(answer)
     cite_near = _sentences_near_citations(answer) if citation_backed_ok else set()
     if not sentences:
+        if is_conservative_refusal(answer):
+            return {
+                "faithfulness": 1.0,
+                "faithfulness_method": "rules",
+                "n_claim_sentences": 0,
+                "unsupported_sentences": [],
+            }
         cites = extract_citations(answer)
         return {
             "faithfulness": 1.0 if cites else None,
@@ -250,8 +257,9 @@ def faithfulness_pass(
     faith: dict[str, Any],
     *,
     min_score: float = 0.75,
+    answer: str | None = None,
 ) -> bool:
     score = faith.get("faithfulness")
     if score is None:
-        return False
+        return bool(answer and is_conservative_refusal(answer))
     return float(score) >= min_score

@@ -35,12 +35,10 @@ def use_fast_d_synth() -> bool:
 def _coord_ref(sn: dict[str, Any]) -> str | None:
     meta = sn.get("metadata") or {}
     coord = meta.get("coord_start") or meta.get("coord") or ""
-    canon = meta.get("canon_id") or sn.get("canon_id") or ""
     if not coord:
         return None
     inner = str(coord).strip().strip("【】")
-    suffix = f"({canon})" if canon else ""
-    return f"【{inner}】{suffix}"
+    return f"【{inner}】"
 
 
 def _aspect_label(sn: dict[str, Any], index: int) -> str:
