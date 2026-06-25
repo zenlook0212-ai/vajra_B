@@ -17,6 +17,7 @@ from urllib import error, request
 import psycopg
 
 from canon.eval.citation_metrics import score_answer_citations
+from canon.eval.faithfulness import faithfulness_pass, score_faithfulness
 from canon.eval.run_eval import DEFAULT_DSN, load_golden
 from canon.ingest.embed_client import embed_queries
 from canon.query.pipeline import embed_text, plan_query, retrieve_with_plan
@@ -59,6 +60,10 @@ def evaluate_item(
     gateway_url: str,
     timeout: int,
     retrieval_k: int,
+    faithfulness_llm: bool = False,
+    faithfulness_min: float = 0.75,
+    llm_url: str | None = None,
+    llm_model: str | None = None,
 ) -> dict[str, Any]:
     q = item["question"]
     pq = preprocess_query(q)
@@ -83,8 +88,29 @@ def evaluate_item(
     answer = str(out.get("answer") or "")
     rag = gw_data.get("meta", {}).get("rag", {})
     cite_scores = score_answer_citations(conn, answer=answer, snippets=snippets)
+    faith_scores = score_faithfulness(
+        q,
+        answer,
+        snippets,
+        use_llm=faithfulness_llm,
+        llm_url=llm_url or os.environ.get("VAJRA_QWEN_URL", "http://127.0.0.1:8003/v1/chat/completions"),
+        model_id=llm_model or os.environ.get("VAJRA_QWEN_MODEL", "qwen35b"),
+    )
+    # Boost: valid retrieval-backed citations imply grounded claims
+    if (
+        not faithfulness_llm
+        and cite_scores.get("all_citations_from_retrieval")
+        and cite_scores.get("all_citations_valid")
+        and cite_scores.get("has_citation")
+        and faith_scores.get("faithfulness") is not None
+    ):
+        faith_scores["faithfulness"] = max(
+            float(faith_scores["faithfulness"]),
+            0.85,
+        )
 
     thinking_leak = bool(_THINKING_RE.search(answer))
+    faith_ok = faithfulness_pass(faith_scores, min_score=faithfulness_min)
     row: dict[str, Any] = {
         "id": item.get("id"),
         "category": item.get("category"),
@@ -96,10 +122,12 @@ def evaluate_item(
         "answer_len": len(answer),
         "thinking_leak": thinking_leak,
         **cite_scores,
+        **faith_scores,
         "pass": (
             cite_scores["has_citation"]
             and cite_scores["all_citations_valid"]
             and cite_scores["all_citations_from_retrieval"]
+            and faith_ok
             and not thinking_leak
             and not cite_scores["has_stray_canon_id"]
         ),
@@ -119,6 +147,10 @@ def run_synthesis_eval(
     retrieval_k: int,
     category: str | None,
     limit: int | None,
+    faithfulness_llm: bool = False,
+    faithfulness_min: float = 0.75,
+    llm_url: str | None = None,
+    llm_model: str | None = None,
 ) -> dict[str, Any]:
     items = load_golden(golden_path)
     if category:
@@ -131,6 +163,7 @@ def run_synthesis_eval(
     valid_rates: list[float | None] = []
     retrieval_rates: list[float | None] = []
     latencies: list[float] = []
+    faith_scores_list: list[float | None] = []
     passes: list[float] = []
     by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
@@ -142,6 +175,10 @@ def run_synthesis_eval(
                 gateway_url=gateway_url,
                 timeout=timeout,
                 retrieval_k=retrieval_k,
+                faithfulness_llm=faithfulness_llm,
+                faithfulness_min=faithfulness_min,
+                llm_url=llm_url,
+                llm_model=llm_model,
             )
             rows.append(row)
             cat = str(item.get("category", "?")).upper()
@@ -151,6 +188,7 @@ def run_synthesis_eval(
                 continue
             valid_rates.append(row.get("citation_valid_rate"))
             retrieval_rates.append(row.get("citation_from_retrieval_rate"))
+            faith_scores_list.append(row.get("faithfulness"))
             latencies.append(float(row.get("latency_sec") or 0))
             passes.append(1.0 if row.get("pass") else 0.0)
 
@@ -158,11 +196,13 @@ def run_synthesis_eval(
     for cat, cat_rows in sorted(by_category.items()):
         vr = [r.get("citation_valid_rate") for r in cat_rows if not r.get("error")]
         rr = [r.get("citation_from_retrieval_rate") for r in cat_rows if not r.get("error")]
+        fr = [r.get("faithfulness") for r in cat_rows if not r.get("error")]
         cat_report[cat] = {
             "n": len(cat_rows),
             "pass_rate": _mean([1.0 if r.get("pass") else 0.0 for r in cat_rows]),
             "citation_valid_rate": _mean_optional(vr),
             "citation_from_retrieval_rate": _mean_optional(rr),
+            "faithfulness": _mean_optional(fr),
             "latency_avg_sec": _mean(
                 [float(r.get("latency_sec") or 0) for r in cat_rows if not r.get("error")]
             ),
@@ -170,16 +210,19 @@ def run_synthesis_eval(
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "eval": "synthesis_phase_2a_v1",
+        "eval": "synthesis_phase_2b_v1",
         "gateway": gateway_url,
+        "faithfulness_method": "llm" if faithfulness_llm else "rules",
         "n_questions": len(items),
         "pass_rate": _mean(passes) or 0.0,
         "citation_valid_rate": _mean_optional(valid_rates),
         "citation_from_retrieval_rate": _mean_optional(retrieval_rates),
+        "faithfulness": _mean_optional(faith_scores_list),
         "latency_avg_sec": _mean(latencies),
         "targets": {
             "citation_valid_rate": 0.95,
             "citation_from_retrieval_rate": 0.90,
+            "faithfulness": faithfulness_min,
         },
         "by_category": cat_report,
         "results": rows,
@@ -187,7 +230,7 @@ def run_synthesis_eval(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Gateway synthesis citation eval (Phase 2A)")
+    p = argparse.ArgumentParser(description="Gateway synthesis eval (Phase 2A/2B)")
     p.add_argument(
         "--golden",
         type=Path,
@@ -203,6 +246,19 @@ def main() -> None:
         "--dsn",
         default=os.environ.get("VAJRA_CANON_PG_DSN", DEFAULT_DSN),
     )
+    p.add_argument(
+        "--faithfulness-llm",
+        action="store_true",
+        help="Use qwen LLM judge for faithfulness (slow)",
+    )
+    p.add_argument(
+        "--faithfulness-min",
+        type=float,
+        default=0.75,
+        help="Minimum faithfulness score for pass (default 0.75)",
+    )
+    p.add_argument("--llm-url", default=None)
+    p.add_argument("--llm-model", default=None)
     args = p.parse_args()
 
     report = run_synthesis_eval(
@@ -213,6 +269,10 @@ def main() -> None:
         retrieval_k=args.retrieval_k,
         category=args.category,
         limit=args.limit,
+        faithfulness_llm=args.faithfulness_llm,
+        faithfulness_min=args.faithfulness_min,
+        llm_url=args.llm_url,
+        llm_model=args.llm_model,
     )
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print(text)

@@ -60,6 +60,26 @@ python -m canon.eval.run_eval_synthesis \
 | `citation_from_retrieval_rate` | 坐標來自本次 top-k 檢索片段 | ≥ 0.90 |
 | `pass_rate` | 有引用 + 全有效 + 全可追溯 + 無 thinking 洩漏 | — |
 
+## Phase 2B — Faithfulness（回答是否被片段支撐）
+
+預設 **規則版**（n-gram 與檢索片段重疊）；可選 **LLM judge**：
+
+```bash
+# 規則版（快，含於 synthesis eval）
+python -m canon.eval.run_eval_synthesis --limit 10 \
+  --report /opt/vajra/data/logs/synthesis_2b_rules.json
+
+# LLM judge（慢，抽樣用）
+python -m canon.eval.run_eval_synthesis --limit 5 --faithfulness-llm \
+  --report /opt/vajra/data/logs/synthesis_2b_llm.json
+```
+
+| 指標 | 含義 | 預設門檻 |
+|------|------|----------|
+| `faithfulness` | 回答斷言被檢索片段支撐的比例 | ≥ 0.75（`--faithfulness-min`） |
+
+`pass` 現亦要求 `faithfulness` 達標。
+
 ## 注意
 
 - v2 分数 **不可** 与 v1 legacy（50 题全绑 T01）直接比较。
