@@ -53,10 +53,10 @@
 {"id": "C18", "category": "C", "question": "壇經如何說無念為宗？", "expected_canon_ids": ["T48n2008"]}
 {"id": "C19", "category": "C", "question": "楞嚴經如何說七處徵心？", "expected_canon_ids": ["T19n0945"]}
 {"id": "C20", "category": "C", "question": "地藏經如何說孝親報恩？", "expected_canon_ids": ["T13n0412"]}
-{"id": "D01", "category": "D", "question": "佛經中如何說緣起？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T02n0150"], "notes": "开放：多部阿含/阿含部可接受"}
-{"id": "D02", "category": "D", "question": "佛經中如何說四諦？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"], "notes": "开放义理"}
+{"id": "D01", "category": "D", "question": "佛經中如何說緣起？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T02n0150"], "notes": "开放：多部阿含/阿含部可接受", "check_cross_translation": true}
+{"id": "D02", "category": "D", "question": "佛經中如何說四諦？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"], "notes": "开放义理", "check_cross_translation": true}
 {"id": "D03", "category": "D", "question": "佛經中如何說八正道？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"]}
-{"id": "D04", "category": "D", "question": "佛經中如何說十二因緣？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T02n0150"]}
+{"id": "D04", "category": "D", "question": "佛經中如何說十二因緣？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T02n0150"], "check_cross_translation": true}
 {"id": "D05", "category": "D", "question": "佛經中如何說涅槃？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T09n0262"]}
 {"id": "D06", "category": "D", "question": "佛經中如何說菩提心？", "expected_canon_ids": ["T09n0262", "T10n0279", "T08n0223", "T14n0475"]}
 {"id": "D07", "category": "D", "question": "佛經中如何說空性？", "expected_canon_ids": ["T08n0235", "T08n0251", "T08n0223", "T16n0675"]}

@@ -5,7 +5,15 @@ from canon.query.survey import (
     format_survey_markdown,
     format_survey_teaser,
     primary_survey_keyword,
+    survey_teaser_enabled,
 )
+
+
+def test_survey_teaser_enabled_modes():
+    assert survey_teaser_enabled("doctrine", query_type="D")
+    assert not survey_teaser_enabled("doctrine", query_type="A")
+    assert survey_teaser_enabled("1", query_type="A")
+    assert not survey_teaser_enabled("0", query_type="D")
 
 
 def test_primary_survey_keyword():

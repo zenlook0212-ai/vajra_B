@@ -17,6 +17,7 @@ from urllib import error, request
 import psycopg
 
 from canon.eval.citation_metrics import is_conservative_refusal, score_answer_citations
+from canon.eval.cross_translation import cross_translation_ok, cross_translation_violations
 from canon.eval.faithfulness import faithfulness_pass, score_faithfulness
 from canon.eval.run_eval import DEFAULT_DSN, load_golden
 from canon.ingest.embed_client import embed_queries
@@ -151,6 +152,16 @@ def evaluate_item(
         pass_kind = "fail"
         passed = False
 
+    check_xtrans = bool(item.get("check_cross_translation"))
+    xtrans_ok = True
+    xtrans_hits: list[str] = []
+    if check_xtrans and answer and not conservative:
+        xtrans_ok = cross_translation_ok(answer)
+        xtrans_hits = cross_translation_violations(answer)
+        if not xtrans_ok and passed:
+            passed = False
+            pass_kind = "cross_translation_violation"
+
     row: dict[str, Any] = {
         "id": item.get("id"),
         "category": item.get("category"),
@@ -167,6 +178,9 @@ def evaluate_item(
         **faith_scores,
         "pass": passed,
         "pass_kind": pass_kind,
+        "check_cross_translation": check_xtrans,
+        "cross_translation_ok": xtrans_ok if check_xtrans else None,
+        "cross_translation_violations": xtrans_hits if check_xtrans else [],
         "preview": answer[:200].replace("\n", " "),
     }
     if err:
@@ -244,6 +258,13 @@ def run_synthesis_eval(
             ),
         }
 
+    xtrans_rows = [r for r in rows if r.get("check_cross_translation") and not r.get("error")]
+    xtrans_pass = (
+        _mean([1.0 if r.get("cross_translation_ok") else 0.0 for r in xtrans_rows])
+        if xtrans_rows
+        else None
+    )
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "eval": "synthesis_phase_2b_v1",
@@ -251,6 +272,8 @@ def run_synthesis_eval(
         "faithfulness_method": "llm" if faithfulness_llm else "rules",
         "n_questions": len(items),
         "pass_rate": _mean(passes) or 0.0,
+        "cross_translation_pass_rate": xtrans_pass,
+        "cross_translation_n": len(xtrans_rows),
         "citation_valid_rate": _mean_optional(valid_rates),
         "citation_from_retrieval_rate": _mean_optional(retrieval_rates),
         "faithfulness": _mean_optional(faith_scores_list),

@@ -1229,10 +1229,12 @@ def create_app() -> FastAPI:
                 "similar_sutra_links": similar_links,
             }
 
-            teaser_on = os.environ.get("VAJRA_RAG_SURVEY_TEASER", "1").strip().lower() in (
-                "1",
-                "true",
-                "yes",
+            _teaser_mode = os.environ.get("VAJRA_RAG_SURVEY_TEASER", "doctrine").strip().lower()
+            from canon.query.survey import survey_teaser_enabled
+
+            teaser_on = survey_teaser_enabled(
+                _teaser_mode,
+                query_type=str(query_plan.query_type or ""),
             )
             if teaser_on and snippets and rag_status in (
                 "pg_hit",

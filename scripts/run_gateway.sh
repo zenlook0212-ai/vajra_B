@@ -7,6 +7,10 @@ export VAJRA_CANON_PG_DSN="${VAJRA_CANON_PG_DSN:-postgresql://vajra:vajra@127.0.
 export VAJRA_CANON_CACHE_KEY_VERSION="${VAJRA_CANON_CACHE_KEY_VERSION:-phase_2c_v6}"
 # D-class: hybrid（摘錄+LLM綜合）| extractive（全快）| llm（全LLM）。例：VAJRA_RAG_D_SYNTH=extractive
 export VAJRA_RAG_D_SYNTH="${VAJRA_RAG_D_SYNTH:-hybrid}"
+export VAJRA_RAG_SURVEY_TEASER="${VAJRA_RAG_SURVEY_TEASER:-doctrine}"
+export VAJRA_LLM_CONTEXT="${VAJRA_LLM_CONTEXT:-12288}"
+export VAJRA_WEBUI_CTX_BUDGET="${VAJRA_WEBUI_CTX_BUDGET:-11000}"
+export VAJRA_LLM_OUTPUT_RESERVE="${VAJRA_LLM_OUTPUT_RESERVE:-1024}"
 # Prefer .venv (canon/pg deps); fall back to venv.
 if [[ -n "${VAJRA_GATEWAY_PYTHON:-}" ]]; then
   PY="$VAJRA_GATEWAY_PYTHON"

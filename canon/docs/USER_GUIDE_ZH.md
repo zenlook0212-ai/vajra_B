@@ -57,7 +57,7 @@
 2. **【綜合回答】** — 模型整合義理關聯（僅引用上列已有坐標）
 3. **CBETA 連結** — 點進原典
 
-義理題回答末尾會自動附 **「還有哪些經提及…」** 精簡表（可關：`VAJRA_RAG_SURVEY_TEASER=0`）；完整列表用 `list_tripitaka_occurrences`。
+義理題回答末尾可附 **「還有哪些經提及…」** 精簡表（預設僅 **D 類義理題**；`VAJRA_RAG_SURVEY_TEASER=1` 全開、`0` 關閉）；完整列表用 `list_tripitaka_occurrences`。
 
 **Teaser 與正文為何不同？** 【義理面向】來自本輪 **語義 top-k**（最相關少數段）；末尾 teaser 來自 **關鍵詞全語料統計**（如 T30N1579 段數多但未必進 top-k）。兩者並列是設計如此，非漏引。
 
@@ -83,19 +83,24 @@
 | `VAJRA_RAG_D_SYNTH` | `hybrid` | `extractive` 全快摘錄；`llm` 全 LLM；`hybrid` 摘錄+綜述 |
 | `VAJRA_RAG_TOP_K` | `8` | 送入合成的檢索段數 |
 
-## Context 上限（8192 tokens）
+## Context 上限（12288 tokens）
 
-**qwen35b** vLLM 設為 `--max-model-len 8192`。時不時報錯 `input_tokens … 8193` 常見原因：
+**qwen35b** vLLM 設為 `--max-model-len 12288`（2026-06 起；原 8192 易在同對話累積時爆 limit）。
 
 | 原因 | 說明 |
 |------|------|
-| **同對話累積** | 多輪問答 + 工具回傳（長答案）塞滿 context |
-| **超長貼文** | 一次貼上整段經文或長問句 |
-| **合成 prompt** | 少數題 retrieval 段數多（已自動裁剪摘錄） |
+| **同對話累積** | 多輪問答 + 工具回傳塞滿 context |
+| **超長貼文** | 一次貼整段經文 |
+| **合成 prompt** | 已自動裁剪摘錄 |
 
-**建議**：佛典考據請 **開新對話**；長討論換新 thread。系統會自動裁剪舊訊息（WebUI patch）與 gateway 摘錄長度。
+**建議**：佛典考據仍請 **開新對話**；系統會裁剪舊訊息（WebUI patch）。
 
-管理員可調：`VAJRA_WEBUI_CTX_BUDGET=6800`、`VAJRA_MAX_USER_MESSAGE_CHARS=4096`。
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `VAJRA_LLM_CONTEXT` | `12288` | 與 vLLM max-model-len 對齊 |
+| `VAJRA_WEBUI_CTX_BUDGET` | `11000` | WebUI 送模型前裁剪 |
+| `VAJRA_MAX_USER_MESSAGE_CHARS` | `4096` | gateway 單次問題上限 |
+| `VAJRA_RAG_SURVEY_TEASER` | `doctrine` | 僅 D 類附 teaser；`1` 全開；`0` 關 |
 
 見 [`GOLDEN_SET.md`](../eval/GOLDEN_SET.md)、[`open-webui-canon-rag.md`](open-webui-canon-rag.md)。
 

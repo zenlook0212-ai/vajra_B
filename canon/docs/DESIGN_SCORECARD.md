@@ -1,90 +1,95 @@
-# Canon RAG 設計方向評分卡（7.8 / 10）
+# Canon RAG 設計方向評分卡
 
-更新：2026-06。完整路線：**A 上線固化 → B 全藏出處 → C 運維自動化**。
+更新：2026-06-26。路線 **A → B → C** 已封板；hybrid + survey + context 12288。
 
 ---
 
 ## 對投資人（商業與護城河）
 
-**總評：7.8 / 10 — 方向正確，差在規模證明與產品閉環未做完。**
+**總評：8.2 / 10**（2026-06-26 hybrid 70q baseline）
 
 | 維度 | 分 | 說明 |
 |------|---|------|
-| 市場差異化 | 8 | 非通用佛學聊天；**檢索 + CBETA 坐標 + 綜述**，可稽核 |
-| 技術護城河 | 7 | hybrid 檢索、題型路由、eval 體系； corpus 與模型非獨占 |
-| 可演示性 | 8 | Open WebUI 端到端可展示；40s 級延遲可接受 |
-| 可擴展 | 8 | B 階段「全藏出處」補齊與 CBETA 分工，不正面硬剛全文索引 |
-| 風險 | 6 | LLM 幻覺（已 guard）、ingest 覆蓋、運維複雜度 |
-| 里程碑 | 7 | recall@5 100%、synthesis pass ~93%；需 A 階段 commit + 全量 re-eval |
+| 市場差異化 | 8 | 檢索 + CBETA 坐標 + 綜述，可稽核 |
+| 技術護城河 | 7 | hybrid 檢索、題型路由、eval 體系 |
+| 可演示性 | 8 | Open WebUI 端到端；義理題 ~40s 級 |
+| 可擴展 | 9 | B1 全藏出處 + B2 teaser + 三層分工清晰 |
+| 風險 | 6 | LLM 綜述段需抽查；ingest 覆蓋非全 T 藏 |
+| 里程碑 | 9 | go_live PASS；**70q pass_rate 98.6%** |
 
-**投資人一句話**：這是 **「帶出處的佛典 Copilot」**，不是 CBETA 複製品；B1 全藏出處上線後敘事可升至 **8.5+**。
+**投資人一句話**：**帶出處的佛典 Copilot** — 義理問答 + 全藏出處表 + CBETA 分工，非全文索引替代品。
 
-**接下來 90 天**：A 封板 → B1 出處列表 → 種子用戶（寺院／佛學院）→ 週報 eval 指標。
+**對外數字（hybrid baseline，2026-06-26）**
+
+| 指標 | 值 | 報告 |
+|------|-----|------|
+| synthesis **pass_rate** | **98.6%** (69/70) | `data/logs/synthesis_hybrid_70q_baseline.json` |
+| citation_valid_rate | **100%** | |
+| faithfulness (rules) | **91.5%** | |
+| cross_translation (D01/D02/D04) | **100%** | 禁「A 即 B」 |
+| 唯一未過 | D13 戒律 | 可追蹤 |
 
 ---
 
 ## 對學者（考據與可用性）
 
-**總評：7.5 / 10 — 適合作「初探與講義草稿」，不可替代 CBETA 逐條核對。**
+**總評：7.8 / 10**
 
 | 維度 | 分 | 說明 |
 |------|---|------|
-| 出處可追溯 | 8 | 答案含 `【T…】` 坐標；hybrid 面向段直接來自 chunk |
-| 覆蓋完整性 | 6 | top-k 摘錄，**非**全藏每一處（B1 將改善） |
-| 綜述品質 | 8 | hybrid 綜合回答可讀；需回原文核對 |
-| 與 CBETA 關係 | 9 | 定位清晰：義理問答 vs [CBETA 關鍵字搜](https://cbetaonline.dila.edu.tw/) |
-| 幻覺控制 | 7 | 無坐標回答會被擋；綜述段偶發多引坐標需抽查 |
+| 出處可追溯 | 8 | 【義理面向】摘錄 + `【T…】`；hybrid 綜述受坐標約束 |
+| 覆蓋完整性 | 7 | top-k 義理 + `list_tripitaka_occurrences` 語料統計 |
+| 綜述品質 | 8 | 跨譯本 prompt 禁硬對名相；eval 自動檢查 |
+| 與 CBETA 關係 | 9 | [USER_GUIDE_ZH.md](USER_GUIDE_ZH.md) 三層分工 |
+| 標籤可讀性 | 8 | 義理標籤如【雜阿含 T99】 |
 
-**學者一句話**：當 **研究助理初稿** 用；定稿與廣泛普查仍用 CBETA。見 [USER_GUIDE_ZH.md](USER_GUIDE_ZH.md)。
-
-**建議工作流**：
-1. 佛典RAG 問義理 → 得面向 + 綜述 + 連結  
-2. CBETA 核對坐標原文  
-3. （B1 後）同一對話「列出全藏出處」補經目  
+**學者工作流**：佛典RAG 義理 → CBETA 核坐標 → 必要時全藏出處表。
 
 ---
 
-## 對維運（你自己／團隊）
+## 對維運
 
-**總評：7.5 / 10 — 架構清晰，patch 與 env 需 runbook 統一。**
+**總評：8.0 / 10**
 
 | 維度 | 分 | 說明 |
 |------|---|------|
-| 可測性 | 8 | `run_eval`、`run_eval_synthesis`、golden set |
-| 可部署 | 7 | `install_openwebui_canon_rag.sh`、`run_gateway.sh` |
-| 配置複雜度 | 6 | `VAJRA_RAG_D_SYNTH`、`CACHE_KEY_VERSION`、多 patch |
-| 觀測 | 6 | logs 在 `data/logs/`；synthesis cron 待 C 階段 |
-| 回滾 | 8 | `D_SYNTH=extractive|hybrid|llm` 一行切換 |
+| 可測性 | 9 | recall + synthesis 70q + cross_translation golden |
+| 可部署 | 8 | `install_openwebui_canon_rag.sh` 一鍵 |
+| 配置 | 7 | env 見下；12288 context 已上 |
+| 觀測 | 7 | 週一 cron smoke；`data/logs/` |
+| 回滾 | 8 | `D_SYNTH=extractive`；`SURVEY_TEASER=0` |
 
-**關鍵環境（gateway）**
+**關鍵環境**
 
 ```bash
 VAJRA_CANON_PG_DSN=postgresql://vajra:vajra@127.0.0.1:5433/canon
-VAJRA_RAG_D_SYNTH=hybrid          # extractive | llm | hybrid
-VAJRA_CANON_CACHE_KEY_VERSION=phase_2c_v5
+VAJRA_RAG_D_SYNTH=hybrid
+VAJRA_CANON_CACHE_KEY_VERSION=phase_2c_v6
+VAJRA_RAG_SURVEY_TEASER=doctrine   # D 類義理才附 teaser；1=全開；0=關
+VAJRA_LLM_CONTEXT=12288            # qwen35b max-model-len
+VAJRA_WEBUI_CTX_BUDGET=11000
 ```
 
-**重裝 WebUI patches**：`bash canon/scripts/install_openwebui_canon_rag.sh`
-
-**驗收**：`bash canon/scripts/go_live_acceptance.sh`
-
-**維運一句話**：先完成 **A（commit + 驗收 + eval）**，再加 **B1 survey**，最後 **C cron**。
+**重裝 WebUI**：`bash canon/scripts/install_openwebui_canon_rag.sh`  
+**驗收**：`bash canon/scripts/go_live_acceptance.sh`  
+**70q eval**：`python3 -m canon.eval.run_eval_synthesis --report data/logs/synthesis_hybrid_70q_baseline.json`
 
 ---
 
-## 路線圖與評分預期
+## 路線圖狀態
 
-| 階段 | 內容 | 預期總分 |
-|------|------|----------|
-| **現在** | hybrid + guard + USER_GUIDE | **7.8** |
-| **A 完成** | git 封板、go_live、70q eval | **8.0** |
-| **B1** | 全藏出處 tool + CBETA 連結 | **8.5** |
-| **C** | 週 eval cron、ops skill | **8.7** |
+| 階段 | 狀態 | 內容 |
+|------|------|------|
+| **A** | ✅ | hybrid、guard、go_live、70q baseline |
+| **B1** | ✅ | `canon_survey` + `list_tripitaka_occurrences` |
+| **B2** | ✅ | RAG 後 teaser（doctrine 模式） |
+| **C** | ✅ | 週 eval cron、canon-rag-ops skill |
+| **P2-8** | ✅ | qwen35b context 12288 |
 
 ---
 
 ## 相關文檔
 
-- [USER_GUIDE_ZH.md](USER_GUIDE_ZH.md) — 使用者：何時用 RAG vs CBETA  
-- [GOLDEN_SET.md](../eval/GOLDEN_SET.md) — 評測指標與門檻  
-- [open-webui-canon-rag.md](open-webui-canon-rag.md) — WebUI 接入  
+- [USER_GUIDE_ZH.md](USER_GUIDE_ZH.md)
+- [GOLDEN_SET.md](../eval/GOLDEN_SET.md)
+- [open-webui-canon-rag.md](open-webui-canon-rag.md)

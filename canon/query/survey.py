@@ -26,6 +26,16 @@ def _coord_display(coord_start: str) -> str:
 _SURVEY_TEASER_CANONS = int(os.environ.get("VAJRA_SURVEY_TEASER_CANONS", "5"))
 
 
+def survey_teaser_enabled(mode: str, *, query_type: str) -> bool:
+    """Teaser modes: doctrine (default) | all/1 | off/0."""
+    m = (mode or "doctrine").strip().lower()
+    if m in ("0", "false", "no", "off"):
+        return False
+    if m in ("1", "true", "yes", "on", "all"):
+        return True
+    return query_type == "D"
+
+
 def primary_survey_keyword(query: str) -> str | None:
     """Doctrine term suitable for post-RAG survey teaser."""
     q = (query or "").strip()

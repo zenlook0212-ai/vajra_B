@@ -78,11 +78,20 @@ python -m canon.eval.run_eval_synthesis --limit 5 --faithfulness-llm \
 |------|------|----------|
 | `faithfulness` | 回答斷言被檢索片段支撐的比例 | ≥ 0.75（`--faithfulness-min`） |
 
-`pass` 現亦要求 `faithfulness` 達標。全修後（2026-06）基線約 **pass_rate 93%**；`pass_kind` 為 `cited` 或 `conservative_refusal`。
+`pass` 現亦要求 `faithfulness` 達標。**Hybrid 70q baseline（2026-06-26）**：pass_rate **98.6%**（69/70）；唯一未過 D13。報告：`data/logs/synthesis_hybrid_70q_baseline.json`。
+
+## 跨譯本約束（D01 / D02 / D04）
+
+golden 欄位 `"check_cross_translation": true` 時，eval 檢查【綜合回答】不得出現：
+
+- `「…」即「…」` 硬對名相
+- `即觸` / `即受` / `即取` 等跨譯本等號式表述
+
+違規 → `pass_kind=cross_translation_violation`。實作：`canon/eval/cross_translation.py`。
 
 ### 語意快取
 
-Gateway 使用 `semantic_cache`；合成格式變更時請 bump `VAJRA_CANON_CACHE_KEY_VERSION`（預設 `phase_2c_v5`）。
+Gateway 使用 `semantic_cache`；合成格式變更時請 bump `VAJRA_CANON_CACHE_KEY_VERSION`（預設 `phase_2c_v6`）。
 
 D 類合成 `VAJRA_RAG_D_SYNTH`：`hybrid`（預設，摘錄+LLM綜合）| `extractive`（全快）| `llm`（全LLM）。
 
