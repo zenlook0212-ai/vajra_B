@@ -14,7 +14,7 @@ CACHE_TTL_DAYS = int(os.environ.get("VAJRA_CANON_CACHE_TTL_DAYS", "7"))
 CACHE_THRESHOLD = float(os.environ.get("VAJRA_CANON_CACHE_COSINE", "0.95"))
 
 
-CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_a6_v2")
+CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_a7_v1")
 MIN_CACHE_CHUNKS = int(os.environ.get("VAJRA_CANON_CACHE_MIN_CHUNKS", "3"))
 
 

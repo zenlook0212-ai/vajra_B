@@ -19,6 +19,7 @@ VEC_OVERFETCH = 200  # used when app-side canon filter after HNSW
 HNSW_EF_SEARCH = 400
 
 _CANON_ID_RE = re.compile(r"\b([A-Z]{1,3}\d+n\d+[a-zA-Z]?)\b", re.I)
+_VOLUME_PREFIX_RE = re.compile(r"^T\d{2}N\d{4}", re.I)
 
 
 def pg_dsn() -> str:
@@ -65,6 +66,16 @@ def _volume_from_canon(canon_id: str) -> int | None:
     return int(vol) if vol.isdigit() else None
 
 
+def _volume_level_targets(prefixes: list[str]) -> list[str]:
+    """Volume IDs (T02N0147) used for scoped vector probe on D-class."""
+    out: list[str] = []
+    for p in prefixes:
+        pu = p.upper()
+        if _VOLUME_PREFIX_RE.match(pu) and pu not in out:
+            out.append(pu)
+    return out[:6]
+
+
 def _rrf_doctrine_multiplier(
     canon_id: str,
     doctrine_boost_prefixes: list[str] | None,
@@ -73,14 +84,55 @@ def _rrf_doctrine_multiplier(
     if not doctrine_boost_prefixes:
         return 1.0
     cid = canon_id.upper()
+    head = [p.upper() for p in doctrine_boost_prefixes[:6]]
+    vol_targets = _volume_level_targets(doctrine_boost_prefixes)
+    if vol_targets:
+        for j, vol in enumerate(vol_targets):
+            if cid.startswith(vol):
+                return 2.4 if j == 0 else 2.1 if j == 1 else 1.9
+        for vol in vol_targets:
+            series = vol[:3]
+            if cid.startswith(series) and not any(cid.startswith(v) for v in vol_targets if v.startswith(series)):
+                return 0.06 if series in ("T24", "T23") else 0.22
+    if cid.startswith("T23") and any(p.startswith("T01") or p.startswith("T02") for p in head):
+        return 0.06
+    if cid.startswith("T15") and any(p.startswith(("T01", "T02", "T48")) for p in head):
+        return 0.08
+    if cid.startswith(("T32", "T40", "T53", "T55")) and vol_targets:
+        return 0.12
     for i, p in enumerate(doctrine_boost_prefixes):
         if cid.startswith(p.upper()):
             if i == 0:
                 return 2.0
             if i == 1:
                 return 1.75
+            if i == 2:
+                return 1.6
             return 1.55
     return 0.18
+
+
+def _doctrine_rerank_rescore(
+    snippets: list[dict[str, Any]],
+    doctrine_boost_prefixes: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Re-order cross-encoder results so doctrine targets are not drowned by vinaya noise."""
+    if not doctrine_boost_prefixes or not snippets:
+        return snippets
+    scored: list[tuple[float, int, dict[str, Any]]] = []
+    for i, sn in enumerate(snippets):
+        cid = str(sn.get("canon_id") or (sn.get("metadata") or {}).get("canon_id", ""))
+        base = sn.get("rerank_score")
+        if base is None:
+            base = sn.get("rank")
+        try:
+            base_f = float(base) if base is not None else 1.0 / (i + 1)
+        except (TypeError, ValueError):
+            base_f = 1.0 / (i + 1)
+        mult = _rrf_doctrine_multiplier(cid, doctrine_boost_prefixes)
+        scored.append((base_f * mult, i, sn))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [sn for _, _, sn in scored]
 
 
 def rrf_fuse(
@@ -136,12 +188,7 @@ def vector_search(
     emb_lit = "[" + ",".join(str(float(x)) for x in embedding) + "]"
     # pgvector HNSW + extra WHERE on canon_id can return empty; over-fetch then filter.
     sql_limit = limit
-    canon_clause = ""
-    canon_params: list[str] = []
-    if canon_prefixes:
-        sql_limit = VEC_OVERFETCH
-    else:
-        canon_clause, canon_params = _canon_filter_sql(canon_prefixes)
+    canon_clause, canon_params = _canon_filter_sql(canon_prefixes)
     with conn.cursor() as cur:
         cur.execute(f"SET LOCAL hnsw.ef_search = {HNSW_EF_SEARCH}")
         cur.execute(
@@ -291,6 +338,18 @@ def hybrid_search(
         conn, bm25_query, series=series, limit=bm25_top, canon_prefixes=prefixes
     )
 
+    doctrine_vec_hits: list[dict[str, Any]] = []
+    if not prefixes and doctrine_boost_prefixes:
+        vol_targets = _volume_level_targets(doctrine_boost_prefixes)
+        if vol_targets:
+            doctrine_vec_hits = vector_search(
+                conn,
+                embedding,
+                series=series,
+                limit=min(12, len(vol_targets) * 4),
+                canon_prefixes=vol_targets,
+            )
+
     sub_rank_lists: list[dict[int, int]] = []
     sub_hits: list[dict[str, Any]] = []
     kw_prefixes = prefixes
@@ -308,16 +367,22 @@ def hybrid_search(
             sub_hits.extend(hits)
             sub_rank_lists.append({h["id"]: i + 1 for i, h in enumerate(hits)})
 
-    all_hits = vec_hits + bm25_hits + sub_hits
+    all_hits = vec_hits + bm25_hits + sub_hits + doctrine_vec_hits
+    if doctrine_vec_hits:
+        sub_rank_lists.append(
+            {h["id"]: i + 1 for i, h in enumerate(doctrine_vec_hits)}
+        )
     if prefixes and len({h["id"] for h in all_hits}) < CANON_FILTER_MIN_HITS:
-        vec_hits = vector_search(conn, embedding, series=series, limit=vec_top)
-        bm25_hits = bm25_search(conn, bm25_query, series=series, limit=bm25_top)
         sub_rank_lists = []
         sub_hits = []
         if sub_terms:
             for term in sub_terms:
                 hits = keyword_search(
-                    conn, term, series=series, limit=sub_term_bm25_top, canon_prefixes=kw_prefixes
+                    conn,
+                    term,
+                    series=series,
+                    limit=sub_term_bm25_top,
+                    canon_prefixes=prefixes,
                 )
                 sub_hits.extend(hits)
                 sub_rank_lists.append({h["id"]: i + 1 for i, h in enumerate(hits)})
@@ -350,10 +415,12 @@ def hybrid_search(
         from canon.query.rerank import rerank_snippets
 
         snippets = rerank_snippets(rerank_q, snippets, top_k=rerank_top)
+        if doctrine_boost_prefixes:
+            snippets = _doctrine_rerank_rescore(snippets, doctrine_boost_prefixes)
     else:
         snippets = snippets[:rerank_top]
 
-    return snippets
+    return snippets[:rerank_top]
 
 
 def snippets_to_gateway_format(snippets: list[dict[str, Any]]) -> list[dict[str, Any]]:

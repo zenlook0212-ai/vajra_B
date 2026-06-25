@@ -986,12 +986,13 @@ def create_app() -> FastAPI:
 
             snippets: list[dict[str, Any]] = []
             pg_err: str | None = None
+            cached_answer: str | None = None
             vec: list[float] | None = None
             if isinstance(emb, dict) and "error" not in emb and "data" in emb:
                 vec = rag_retrieval.extract_openai_embedding_vector(emb)
 
             if vec:
-                snippets, pg_err, _sub_terms = await pg_retrieval.pg_query_snippets(
+                snippets, pg_err, _sub_terms, cached_answer = await pg_retrieval.pg_query_snippets(
                     pq=pq,
                     plan=query_plan,
                     embedding=vec,
@@ -1004,16 +1005,31 @@ def create_app() -> FastAPI:
             )
             similar_links = rag_retrieval.extract_similar_sutra_links(snippets)
 
-            if snippets:
+            answer: str = ""
+            synth_prompt: str = ""
+
+            if cached_answer and snippets:
+                rag_status = "cache_hit"
+                answer = cached_answer
+            elif snippets:
                 k_prompt = rag_retrieval.rag_top_k()
                 for_llm = snippets[:k_prompt]
-                if query_plan.query_type == "D":
-                    synth_prompt = build_canon_synth_prompt_d_class(
-                        body.message, for_llm
-                    )
+                from canon.query.extractive_synth import fast_d_class_answer, use_fast_d_synth
+
+                fast_answer: str | None = None
+                if query_plan.query_type == "D" and use_fast_d_synth():
+                    fast_answer = fast_d_class_answer(body.message, for_llm)
+                if fast_answer:
+                    rag_status = "pg_hit_fast_d"
+                    answer = fast_answer
                 else:
-                    synth_prompt = build_canon_synth_prompt(body.message, for_llm)
-                rag_status = "pg_hit"
+                    if query_plan.query_type == "D":
+                        synth_prompt = build_canon_synth_prompt_d_class(
+                            body.message, for_llm
+                        )
+                    else:
+                        synth_prompt = build_canon_synth_prompt(body.message, for_llm)
+                    rag_status = "pg_hit"
             else:
                 synth_prompt = (
                     "使用者問題：\n"
@@ -1045,6 +1061,13 @@ def create_app() -> FastAPI:
                 preview.append(row)
 
             synth_profile = rag_retrieval.rag_synth_profile(body.message)
+            synth_kind = "standard"
+            if query_plan.query_type == "D":
+                synth_kind = (
+                    "d_extractive"
+                    if rag_status == "pg_hit_fast_d"
+                    else "d_structured"
+                )
             meta["rag"] = {
                 "backend": "pgvector",
                 "query_intent": pq.intent,
@@ -1052,25 +1075,27 @@ def create_app() -> FastAPI:
                 "series_hint": pq.series_hint,
                 "hits": len(snippets),
                 "status": rag_status,
-                "synthesis": "d_structured" if query_plan.query_type == "D" else "standard",
+                "synthesis": synth_kind,
             }
 
-            sys_msg = synthesizer_system_message(query_type=query_plan.query_type)
-            synth_temp = rag_retrieval.rag_synth_temperature(synth_profile)
-            answer, _ = await _llm_chat_completion(
-                http,
-                url=q["url"],
-                model_id=q["model_id"],
-                messages=[
-                    {"role": "system", "content": sys_msg},
-                    {"role": "user", "content": synth_prompt},
-                ],
-                max_tokens=2048,
-                temperature=synth_temp,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-            )
+            if not answer:
+                sys_msg = synthesizer_system_message(query_type=query_plan.query_type)
+                synth_temp = rag_retrieval.rag_synth_temperature(synth_profile)
+                max_tok = 1024 if query_plan.query_type == "D" else 2048
+                answer, _ = await _llm_chat_completion(
+                    http,
+                    url=q["url"],
+                    model_id=q["model_id"],
+                    messages=[
+                        {"role": "system", "content": sys_msg},
+                        {"role": "user", "content": synth_prompt},
+                    ],
+                    max_tokens=max_tok,
+                    temperature=synth_temp,
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                )
 
-            if vec and snippets and rag_status == "pg_hit":
+            if vec and snippets and rag_status in ("pg_hit", "pg_hit_fast_d"):
                 await asyncio.to_thread(
                     pg_retrieval.store_answer_cache,
                     pq=pq,

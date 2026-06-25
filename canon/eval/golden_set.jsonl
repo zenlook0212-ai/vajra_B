@@ -8,12 +8,12 @@
 {"id": "A08", "category": "A", "question": "長阿含經共有多少經為一部？", "expected_canon_ids": ["T01n0001"], "sample_answer": "【T01n0001_p0001a13】合三十經以為一部"}
 {"id": "A09", "category": "A", "question": "姚興請誰譯出長阿含？", "expected_canon_ids": ["T01n0001"], "sample_answer": "【T01n0001_p0001b01】出此《長阿含》訖"}
 {"id": "A10", "category": "A", "question": "長阿含經序如何形容阿含對學人的利益？", "expected_canon_ids": ["T01n0001"], "sample_answer": "【T01n0001_p0001a19】長迷頓曉"}
-{"id": "A11", "category": "A", "question": "大品般若經如何定義般若波羅蜜多？", "expected_canon_ids": ["T02n0223"], "sample_answer": "prajñāpāramitā 般若"}
+{"id": "A11", "category": "A", "question": "大品般若經如何定義般若波羅蜜多？", "expected_canon_ids": ["T08n0223"], "sample_answer": "prajñāpāramitā 般若"}
 {"id": "A12", "category": "A", "question": "金剛經的核心主題是什麼？", "expected_canon_ids": ["T08n0235"], "sample_answer": "應無所住而生其心"}
 {"id": "A13", "category": "A", "question": "般若心經如何說色與空的關係？", "expected_canon_ids": ["T08n0251"], "sample_answer": "色即是空"}
 {"id": "A14", "category": "A", "question": "妙法蓮華經方便品說什麼？", "expected_canon_ids": ["T09n0262"], "sample_answer": "方便"}
 {"id": "A15", "category": "A", "question": "華嚴經如何說法界？", "expected_canon_ids": ["T10n0279"], "sample_answer": "法界"}
-{"id": "A16", "category": "A", "question": "阿彌陀經的主要內容是什麼？", "expected_canon_ids": ["T12n0360"], "sample_answer": "阿彌陀佛"}
+{"id": "A16", "category": "A", "question": "阿彌陀經的主要內容是什麼？", "expected_canon_ids": ["T12n0366"], "sample_answer": "阿彌陀佛"}
 {"id": "A17", "category": "A", "question": "解深密經如何說深密義？", "expected_canon_ids": ["T16n0675"], "sample_answer": "深密"}
 {"id": "A18", "category": "A", "question": "維摩詰經中維摩詰示疾說什麼？", "expected_canon_ids": ["T14n0475"], "sample_answer": "維摩詰"}
 {"id": "A19", "category": "A", "question": "楞嚴經如何說真心？", "expected_canon_ids": ["T19n0945"], "sample_answer": "如來藏"}
@@ -22,7 +22,7 @@
 {"id": "B02", "category": "B", "question": "妙法蓮華經的偈頌如何讚歎佛？", "expected_canon_ids": ["T09n0262"], "notes": "别名：妙法蓮華"}
 {"id": "B03", "category": "B", "question": "大方廣佛華嚴經的入法界品講什麼？", "expected_canon_ids": ["T10n0279"], "notes": "别名：大方廣佛華嚴"}
 {"id": "B04", "category": "B", "question": "般若波羅蜜多心經的色空義如何說？", "expected_canon_ids": ["T08n0251"], "notes": "全称心経"}
-{"id": "B05", "category": "B", "question": "佛說阿彌陀經的西方淨土如何描述？", "expected_canon_ids": ["T12n0360"], "notes": "别名：佛說阿彌陀"}
+{"id": "B05", "category": "B", "question": "佛說阿彌陀經的西方淨土如何描述？", "expected_canon_ids": ["T12n0366"], "notes": "CBETA 短本阿彌陀經為 T12n0366"}
 {"id": "B06", "category": "B", "question": "地藏菩薩本願經如何說地獄報？", "expected_canon_ids": ["T13n0412"], "notes": "别名：地藏經"}
 {"id": "B07", "category": "B", "question": "六祖大師法寶壇經如何說無念？", "expected_canon_ids": ["T48n2008"], "notes": "别名：壇經全称"}
 {"id": "B08", "category": "B", "question": "T08n0235 如何說應無所住？", "expected_canon_ids": ["T08n0235"], "notes": "经号直输"}
@@ -32,7 +32,7 @@
 {"id": "B12", "category": "B", "question": "法華經方便品為何稱方便？", "expected_canon_ids": ["T09n0262"], "notes": "法華經简称"}
 {"id": "B13", "category": "B", "question": "華嚴經普賢行願品說什麼？", "expected_canon_ids": ["T10n0279"], "notes": "華嚴經简称"}
 {"id": "B14", "category": "B", "question": "心經中舍利子問什麼？", "expected_canon_ids": ["T08n0251"], "notes": "心經简称"}
-{"id": "B15", "category": "B", "question": "大品般若經如何說空性？", "expected_canon_ids": ["T02n0223"], "notes": "大品般若别名"}
+{"id": "B15", "category": "B", "question": "大品般若經如何說空性？", "expected_canon_ids": ["T08n0223"], "notes": "大品般若 CBETA T08n0223"}
 {"id": "C01", "category": "C", "question": "長阿含經中如何說十二因緣？", "expected_canon_ids": ["T01n0001"], "notes": "范围：長阿含"}
 {"id": "C02", "category": "C", "question": "長阿含經中如何說四諦？", "expected_canon_ids": ["T01n0001"]}
 {"id": "C03", "category": "C", "question": "長阿含經中如何說八正道？", "expected_canon_ids": ["T01n0001"]}
@@ -46,10 +46,10 @@
 {"id": "C11", "category": "C", "question": "心經如何說諸法空相？", "expected_canon_ids": ["T08n0251"]}
 {"id": "C12", "category": "C", "question": "法華經如何說一佛乘？", "expected_canon_ids": ["T09n0262"]}
 {"id": "C13", "category": "C", "question": "華嚴經如何說理事無礙？", "expected_canon_ids": ["T10n0279"]}
-{"id": "C14", "category": "C", "question": "大品般若經如何說般若波羅蜜？", "expected_canon_ids": ["T02n0223"]}
+{"id": "C14", "category": "C", "question": "大品般若經如何說般若波羅蜜？", "expected_canon_ids": ["T08n0223"]}
 {"id": "C15", "category": "C", "question": "維摩詰經如何說不二法門？", "expected_canon_ids": ["T14n0475"]}
 {"id": "C16", "category": "C", "question": "解深密經如何說三性？", "expected_canon_ids": ["T16n0675"]}
-{"id": "C17", "category": "C", "question": "阿彌陀經如何說執持名號？", "expected_canon_ids": ["T12n0360"]}
+{"id": "C17", "category": "C", "question": "阿彌陀經如何說執持名號？", "expected_canon_ids": ["T12n0366"]}
 {"id": "C18", "category": "C", "question": "壇經如何說無念為宗？", "expected_canon_ids": ["T48n2008"]}
 {"id": "C19", "category": "C", "question": "楞嚴經如何說七處徵心？", "expected_canon_ids": ["T19n0945"]}
 {"id": "C20", "category": "C", "question": "地藏經如何說孝親報恩？", "expected_canon_ids": ["T13n0412"]}
@@ -58,13 +58,13 @@
 {"id": "D03", "category": "D", "question": "佛經中如何說八正道？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"]}
 {"id": "D04", "category": "D", "question": "佛經中如何說十二因緣？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T02n0150"]}
 {"id": "D05", "category": "D", "question": "佛經中如何說涅槃？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125", "T09n0262"]}
-{"id": "D06", "category": "D", "question": "佛經中如何說菩提心？", "expected_canon_ids": ["T09n0262", "T10n0279", "T02n0223", "T14n0475"]}
-{"id": "D07", "category": "D", "question": "佛經中如何說空性？", "expected_canon_ids": ["T08n0235", "T08n0251", "T02n0223", "T16n0675"]}
+{"id": "D06", "category": "D", "question": "佛經中如何說菩提心？", "expected_canon_ids": ["T09n0262", "T10n0279", "T08n0223", "T14n0475"]}
+{"id": "D07", "category": "D", "question": "佛經中如何說空性？", "expected_canon_ids": ["T08n0235", "T08n0251", "T08n0223", "T16n0675"]}
 {"id": "D08", "category": "D", "question": "佛經中如何說無常？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"]}
 {"id": "D09", "category": "D", "question": "佛經中如何說無我？", "expected_canon_ids": ["T01n0001", "T02n0099", "T08n0235"]}
 {"id": "D10", "category": "D", "question": "佛經中如何說禪定？", "expected_canon_ids": ["T01n0001", "T02n0099", "T48n2008"]}
 {"id": "D11", "category": "D", "question": "佛經中如何說菩薩行？", "expected_canon_ids": ["T09n0262", "T10n0279", "T14n0475"]}
-{"id": "D12", "category": "D", "question": "佛經中如何說淨土？", "expected_canon_ids": ["T12n0360", "T09n0262", "T10n0279"]}
+{"id": "D12", "category": "D", "question": "佛經中如何說淨土？", "expected_canon_ids": ["T12n0360", "T12n0366", "T09n0262", "T10n0279"]}
 {"id": "D13", "category": "D", "question": "佛經中如何說戒律？", "expected_canon_ids": ["T01n0001", "T02n0147", "T24n1461"]}
 {"id": "D14", "category": "D", "question": "佛經中如何說阿羅漢果？", "expected_canon_ids": ["T01n0001", "T02n0099", "T02n0125"]}
-{"id": "D15", "category": "D", "question": "佛經中如何說中道？", "expected_canon_ids": ["T01n0001", "T08n0235", "T09n0262", "T02n0223"]}
+{"id": "D15", "category": "D", "question": "佛經中如何說中道？", "expected_canon_ids": ["T01n0001", "T08n0235", "T09n0262", "T08n0223"]}

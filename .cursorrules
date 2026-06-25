@@ -146,3 +146,8 @@ import logging
 import pynvml
 
 logger = logging.getLogger(__name__)
+```
+
+## 8. 全域總角色（Cursor 專案規則）
+
+人設、典籍工作流與 Telegram 產品協議：**`.cursor/rules/vajra-global-system-role.mdc`**（`alwaysApply: true`）。與上文工程鐵律並存；若有衝突，以**可審計、安全的程式行為**（異步、無全盤掃描等）為準。

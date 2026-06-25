@@ -77,7 +77,27 @@ def expand_doctrine_terms(query: str) -> list[str]:
                 terms.append(extra)
 
     if "戒律" in q or "戒" in q:
-        for extra in ("波羅提木叉", "戒經", "比丘戒", "摩訶僧祇律", "四分律", "十誦律", "僧祇律"):
+        for extra in (
+            "禁律",
+            "律藏",
+            "長阿含經序",
+            "波羅提木叉",
+            "波羅提木叉經",
+            "戒經",
+            "比丘戒",
+            "梵行清淨",
+            "增壹阿含",
+        ):
+            if extra not in terms:
+                terms.append(extra)
+
+    if "四諦" in q:
+        for extra in ("苦諦", "集諦", "滅諦", "道諦", "四聖諦", "阿含"):
+            if extra not in terms:
+                terms.append(extra)
+
+    if "空性" in q:
+        for extra in ("色即是空", "心經", "金剛經", "般若", "śūnyatā"):
             if extra not in terms:
                 terms.append(extra)
 
@@ -95,7 +115,13 @@ def expand_doctrine_terms(query: str) -> list[str]:
         terms.append("因緣")
 
     if "中道" in q:
-        for extra in ("八正道", "正見", "中阿含經"):
+        for extra in (
+            "八正道",
+            "正見",
+            "中阿含經",
+            "般若",
+            "八不中",
+        ):
             if extra not in terms:
                 terms.append(extra)
 

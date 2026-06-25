@@ -28,7 +28,7 @@ def _hybrid_sync(
     plan: Any,
     embedding: list[float],
     series: str,
-) -> tuple[list[dict[str, Any]], str | None, list[str] | None]:
+) -> tuple[list[dict[str, Any]], str | None, list[str] | None, str | None]:
     try:
         from canon.query.cache import lookup_cache
         from canon.query.pipeline import retrieve_with_plan
@@ -42,7 +42,7 @@ def _hybrid_sync(
             if cached and cached.get("answer"):
                 chunks = cached.get("top_chunks") or []
                 if isinstance(chunks, list) and chunks:
-                    return chunks, "cache_hit", None
+                    return chunks, "cache_hit", None, str(cached.get("answer") or "")
 
             hits, sub_terms = retrieve_with_plan(conn, pq, plan, embedding)
             if plan.query_type == "D":
@@ -53,10 +53,10 @@ def _hybrid_sync(
                     sub_terms,
                     plan.doctrine_boost_prefixes,
                 )
-        return snippets_to_gateway_format(hits), None, sub_terms
+        return snippets_to_gateway_format(hits), None, sub_terms, None
     except Exception as exc:
         logger.warning("PG hybrid search failed: %s", exc)
-        return [], str(exc), None
+        return [], str(exc), None, None
 
 
 async def pg_query_snippets(
@@ -65,7 +65,7 @@ async def pg_query_snippets(
     plan: Any,
     embedding: list[float],
     series: str = "T",
-) -> tuple[list[dict[str, Any]], str | None, list[str] | None]:
+) -> tuple[list[dict[str, Any]], str | None, list[str] | None, str | None]:
     return await asyncio.to_thread(
         _hybrid_sync,
         pq=pq,

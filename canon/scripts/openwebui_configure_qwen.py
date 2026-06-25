@@ -1,4 +1,4 @@
-"""Configure qwen35b workspace model: disable thinking + optional system prompt."""
+"""Configure qwen35b workspace models: Canon RAG + thinking variant."""
 import json
 import sqlite3
 import sys
@@ -6,18 +6,85 @@ import time
 
 DB = "/app/backend/data/webui.db"
 
-PARAMS = {
-    "function_calling": "native",
-    "custom_params": {
-        "chat_template_kwargs": {"enable_thinking": False},
+MODELS = [
+    {
+        "id": "qwen35b",
+        "base_model_id": None,
+        "name": "qwen35b · 佛典RAG",
+        "params": {
+            "function_calling": "native",
+            "custom_params": {
+                "chat_template_kwargs": {"enable_thinking": False},
+                "parallel_tool_calls": False,
+            },
+            "system": (
+                "你是繁體中文佛典助理。禁止輸出 thinking process 等內部思考。"
+                "本模型僅回答佛經、大藏經、CBETA 考據。"
+                "若使用者問題非佛典考據（閒聊、打招呼等），直接回覆："
+                "「我是佛典助理，不閒聊。請問大藏經、CBETA 或某部經的內容／出處／義理。」"
+                "禁止呼叫任何工具。"
+                "當使用者問佛經、大藏經、CBETA、某部經的内容／出處／義理時，"
+                "必須呼叫 search_tripitaka 工具查語料，不可憑記憶捏造經文或經號。"
+                "只允許呼叫 search_tripitaka 一次；question 參數必須使用使用者完整原問，"
+                "禁止改寫關鍵詞（如序品、法教）後重複呼叫。"
+                "若 search_tripitaka 已返回含【T…】坐標與 CBETA 連結的內容，"
+                "原樣輸出（僅可排版），禁止改寫經文、坐標或連結，禁止再次呼叫任何工具。"
+            ),
+        },
+        "meta": {
+            "description": "佛典 RAG（thinking 關）— 問經、CBETA、大藏經請選此模型",
+            "toolIds": ["cbeta_canon_rag"],
+            "capabilities": {"builtin_tools": False},
+        },
     },
-    "system": (
-        "你是繁體中文佛典助理。禁止輸出 thinking process 等內部思考。"
-        "當使用者問佛經、大藏經、CBETA、某部經的内容／出處／義理時，"
-        "必須呼叫 search_tripitaka 工具查語料，不可憑記憶捏造經文或經號。"
-        "若工具已返回結果，請直接整理轉述，保留其中的【T坐標】與 CBETA 連結。"
-    ),
-}
+    {
+        "id": "qwen35b-thinking",
+        "base_model_id": "qwen35b",
+        "name": "qwen35b · 深度推理",
+        "params": {
+            "custom_params": {
+                "chat_template_kwargs": {"enable_thinking": True},
+            },
+            "system": (
+                "你是繁體中文助理。可使用內部思考輔助推理，但最終回覆請以繁體中文正文呈現。"
+                "佛經、大藏經、CBETA 考據問題請改用「qwen35b · 佛典RAG」模型（含 Canon RAG 工具）。"
+            ),
+        },
+        "meta": {
+            "description": "深度推理（thinking 開）— 一般難題；佛典考據請選「qwen35b · 佛典RAG」",
+            "capabilities": {"builtin_tools": False},
+        },
+    },
+]
+
+
+def upsert_model(
+    cur: sqlite3.Cursor,
+    *,
+    user_id: str,
+    model_id: str,
+    base_model_id: str | None,
+    name: str,
+    params: dict,
+    meta: dict,
+    now: int,
+) -> None:
+    params_json = json.dumps(params, ensure_ascii=False)
+    meta_json = json.dumps(meta, ensure_ascii=False)
+    cur.execute("SELECT id FROM model WHERE id=?", (model_id,))
+    if cur.fetchone():
+        cur.execute(
+            "UPDATE model SET base_model_id=?, name=?, params=?, meta=?, updated_at=?, is_active=1 WHERE id=?",
+            (base_model_id, name, params_json, meta_json, now, model_id),
+        )
+        print("updated model", model_id)
+    else:
+        cur.execute(
+            "INSERT INTO model (id,user_id,base_model_id,name,params,meta,updated_at,created_at,is_active) "
+            "VALUES (?,?,?,?,?,?,?,?,1)",
+            (model_id, user_id, base_model_id, name, params_json, meta_json, now, now),
+        )
+        print("inserted model", model_id)
 
 
 def main() -> None:
@@ -30,26 +97,17 @@ def main() -> None:
         sys.exit(1)
     user_id = row[0]
     now = int(time.time())
-    params_json = json.dumps(PARAMS, ensure_ascii=False)
-    meta_json = json.dumps(
-        {"description": "qwen35b with thinking disabled for Vajra stack"},
-        ensure_ascii=False,
-    )
-    model_id = "qwen35b"
-    cur.execute("SELECT id FROM model WHERE id=?", (model_id,))
-    if cur.fetchone():
-        cur.execute(
-            "UPDATE model SET params=?, meta=?, updated_at=?, is_active=1 WHERE id=?",
-            (params_json, meta_json, now, model_id),
+    for spec in MODELS:
+        upsert_model(
+            cur,
+            user_id=user_id,
+            model_id=spec["id"],
+            base_model_id=spec["base_model_id"],
+            name=spec["name"],
+            params=spec["params"],
+            meta=spec["meta"],
+            now=now,
         )
-        print("updated model", model_id)
-    else:
-        cur.execute(
-            "INSERT INTO model (id,user_id,base_model_id,name,params,meta,updated_at,created_at,is_active) "
-            "VALUES (?,?,?,?,?,?,?,?,1)",
-            (model_id, user_id, None, "qwen35b", params_json, meta_json, now, now),
-        )
-        print("inserted model", model_id)
     conn.commit()
 
 
