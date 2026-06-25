@@ -1,11 +1,9 @@
 """
-Open WebUI Filter: block parametric canon answers without CBETA coords.
-
-Replaces assistant replies that look like encyclopedic hallucinations
-(no 【T…】 / cbeta links) when the user asked a canon question.
+title: Canon RAG Guard
+author: vajra
+version: 0.2.0
+description: Block parametric canon answers without CBETA coords
 """
-from __future__ import annotations
-
 import re
 
 from pydantic import BaseModel, Field
@@ -48,7 +46,7 @@ _HALLUCINATION_RE = re.compile(
 
 _GUARD_MSG = (
     "【系統】此回覆未經 CBETA 語料檢索（無【T…】坐標），可能為模型記憶生成，不作考據依據。\n\n"
-    "請確認已選 **qwen35b · 佛典RAG**，並重新發送原問題；"
+    "請確認已選 qwen35b · 佛典RAG，並重新發送原問題；"
     "助理將呼叫 search_tripitaka，返回含【義理面向】／【綜合回答】與 CBETA 坐標的內容。"
 )
 

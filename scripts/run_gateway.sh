@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VAJRA_MODELS_YAML="${VAJRA_MODELS_YAML:-$ROOT/models.yaml}"
 export PYTHONPATH="$ROOT"
 export VAJRA_CANON_PG_DSN="${VAJRA_CANON_PG_DSN:-postgresql://vajra:vajra@127.0.0.1:5433/canon}"
-export VAJRA_CANON_CACHE_KEY_VERSION="${VAJRA_CANON_CACHE_KEY_VERSION:-phase_2c_v5}"
+export VAJRA_CANON_CACHE_KEY_VERSION="${VAJRA_CANON_CACHE_KEY_VERSION:-phase_2c_v6}"
 # D-class: hybrid（摘錄+LLM綜合）| extractive（全快）| llm（全LLM）。例：VAJRA_RAG_D_SYNTH=extractive
 export VAJRA_RAG_D_SYNTH="${VAJRA_RAG_D_SYNTH:-hybrid}"
 # Prefer .venv (canon/pg deps); fall back to venv.

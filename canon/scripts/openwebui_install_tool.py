@@ -13,7 +13,7 @@ from open_webui.utils.tools import get_tool_specs, load_tool_module_by_id
 
 TOOL_PATH = "/tmp/openwebui_canon_rag.py"
 CONTENT = open(TOOL_PATH).read()
-if "title:" not in CONTENT.split("\n", 1)[0]:
+if "title:" not in CONTENT:
     CONTENT = '"""\ntitle: CBETA Canon RAG\nauthor: vajra\nversion: 0.1.0\n"""\n' + CONTENT
 
 

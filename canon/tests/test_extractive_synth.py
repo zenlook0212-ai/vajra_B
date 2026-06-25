@@ -86,7 +86,7 @@ def test_summary_uses_labels_not_raw_fragments():
     assert out is not None
     summary = out.split("【綜合回答】", 1)[1]
     assert "依檢索語料" in summary
-    assert "阿含經" in summary
+    assert "雜阿含 T99" in out or "阿含部" in out
     assert "<p>" not in summary
     assert "[05]" not in summary
     assert "；繫念在前" not in summary
@@ -99,7 +99,7 @@ def test_d_synth_mode_hybrid_default(monkeypatch):
 
 
 def test_sanitize_hybrid_summary_strips_unknown_coords():
-    aspects = "【義理面向】\n1. 【阿含經】緣起。【T02n0099_p0156c21_】"
+    aspects = "【義理面向】\n1. 【雜阿含 T99】緣起。【T02n0099_p0156c21_】"
     summary = "綜述。【T02n0099_p0156c21_】【T99n9999_p0001a01_】"
     out = sanitize_hybrid_summary(summary, aspects)
     assert "T02n0099" in out
@@ -107,7 +107,12 @@ def test_sanitize_hybrid_summary_strips_unknown_coords():
 
 
 def test_assemble_hybrid_d_answer():
-    body = format_d_aspects_body(["1. 【阿含經】緣起。【T02n0099_p0156c21_】", "2. 【阿含經】滅諦。【T02n0125_p0798a13_】"])
+    body = format_d_aspects_body(
+        [
+            "1. 【雜阿含 T99】緣起。【T02n0099_p0156c21_】",
+            "2. 【增一阿含 T125】滅諦。【T02n0125_p0798a13_】",
+        ]
+    )
     out = assemble_hybrid_d_answer(body, "十二因緣順逆觀為核心。【T02n0099_p0156c21_】")
     assert "【義理面向】" in out
     assert "【綜合回答】" in out

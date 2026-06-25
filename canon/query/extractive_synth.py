@@ -8,17 +8,37 @@ from typing import Any
 
 from canon.query.display_sanitize import sanitize_display_markdown
 
-_ASPECT_LABELS: dict[str, str] = {
-    "T01": "阿含／長部",
-    "T02": "阿含經",
-    "T03": "般若部",
+# Scholar-facing labels: canon_id -> display (override vol defaults)
+_KNOWN_SUTRA_LABELS: dict[str, str] = {
+    "T01N0001": "長阿含 T1",
+    "T02N0099": "雜阿含 T99",
+    "T02N0125": "增一阿含 T125",
+    "T02N0147": "雜阿含 T147",
+    "T08N0235": "金剛般若 T235",
+}
+
+_VOL_SERIES: dict[str, str] = {
+    "T01": "長阿含",
+    "T02": "阿含部",
+    "T03": "本緣部",
     "T06": "般若部",
+    "T07": "般若部",
     "T08": "般若部",
-    "T09": "大乘論疏",
-    "T12": "淨土／華嚴",
+    "T09": "般若部",
+    "T11": "華嚴部",
+    "T12": "華嚴／淨土",
     "T14": "密教",
     "T16": "論藏",
     "T24": "律藏",
+    "T25": "論藏",
+    "T26": "論藏",
+    "T30": "論藏",
+    "T33": "論疏",
+    "T34": "論疏",
+    "T36": "禪／密",
+    "T41": "論疏",
+    "T43": "論疏",
+    "T44": "論疏",
     "T48": "禪宗",
 }
 
@@ -115,13 +135,25 @@ def _coord_ref(sn: dict[str, Any]) -> str | None:
     return f"【{inner}】"
 
 
+def scholar_canon_label(canon_id: str, *, fallback_index: int = 0) -> str:
+    """Scholar label e.g. 雜阿含 T99 from T02n0099."""
+    cid = (canon_id or "").upper().strip()
+    if cid in _KNOWN_SUTRA_LABELS:
+        return _KNOWN_SUTRA_LABELS[cid]
+    m = re.match(r"^(T\d+)N(\d+)$", cid)
+    if m:
+        vol, num = m.group(1), m.group(2)
+        series = _VOL_SERIES.get(vol, vol)
+        return f"{series} T{int(num)}"
+    if fallback_index:
+        return f"義理面向{fallback_index}"
+    return cid or "未知經"
+
+
 def _aspect_label(sn: dict[str, Any], index: int) -> str:
     canon = str((sn.get("metadata") or {}).get("canon_id") or sn.get("canon_id") or "")
-    cid = canon.upper()
-    if len(cid) >= 3 and cid.startswith("T"):
-        vol = cid[:3]
-        if vol in _ASPECT_LABELS:
-            return _ASPECT_LABELS[vol]
+    if canon:
+        return scholar_canon_label(canon, fallback_index=index)
     return f"義理面向{index}"
 
 

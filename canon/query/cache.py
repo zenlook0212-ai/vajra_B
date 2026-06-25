@@ -15,7 +15,7 @@ CACHE_TTL_DAYS = int(os.environ.get("VAJRA_CANON_CACHE_TTL_DAYS", "7"))
 CACHE_THRESHOLD = float(os.environ.get("VAJRA_CANON_CACHE_COSINE", "0.95"))
 
 # Bump when synthesis format changes (e.g. extractive cite suffix removal).
-CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_2c_v5")
+CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_2c_v6")
 _OLD_CITE_SUFFIX_RE = re.compile(r"】\s*\([A-Z]{1,3}\d+n\d+", re.I)
 MIN_CACHE_CHUNKS = int(os.environ.get("VAJRA_CANON_CACHE_MIN_CHUNKS", "3"))
 

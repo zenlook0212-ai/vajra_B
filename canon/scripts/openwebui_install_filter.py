@@ -9,7 +9,7 @@ FILTER_PATH = "/tmp/openwebui_canon_rag_filter.py"
 DB = "/app/backend/data/webui.db"
 
 CONTENT = open(FILTER_PATH, encoding="utf-8").read()
-if "title:" not in CONTENT.split("\n", 1)[0]:
+if "title:" not in CONTENT:
     CONTENT = (
         '"""\n'
         "title: Canon RAG Guard\n"

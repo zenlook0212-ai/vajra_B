@@ -1,6 +1,8 @@
 """
-Open WebUI Function: CBETA Canon RAG
-Copy to Open WebUI Admin → Functions, or mount this file.
+title: CBETA Canon RAG
+author: vajra
+version: 0.2.0
+description: CBETA Canon RAG via Vajra gateway (search + survey tools)
 """
 import os
 import re
@@ -31,11 +33,11 @@ def _sanitize_display_markdown(text: str) -> str:
     out = _HR_RE.sub("", out)
     return re.sub(r"\n{3,}", "\n\n", out).strip()
 
+
 GATEWAY = os.environ.get("VAJRA_GATEWAY_URL", "http://127.0.0.1:8081")
 
 REFUSAL = "我是佛典助理，不閒聊。請問大藏經、CBETA 或某部經的內容／出處／義理。"
 
-# Obvious greetings / small talk — never worth a gateway round-trip.
 _CHITCHAT_RE = re.compile(
     r"^(?:"
     r"h+i+h*i|hi+|hello+|hey+|yo+|test+|ok+|okay+|"
@@ -47,7 +49,6 @@ _CHITCHAT_RE = re.compile(
     re.I,
 )
 
-# Enough signal that the user is asking about canon / Buddhist texts.
 _CANON_SIGNAL_RE = re.compile(
     r"CBETA|cbeta|大藏|大正|T\d{2}|"
     r"佛經|佛经|佛典|藏經|藏经|經文|经藏|律藏|論藏|论藏|契經|"
@@ -56,13 +57,12 @@ _CANON_SIGNAL_RE = re.compile(
     r"涅槃|菩薩|菩萨|如來|如来|羅漢|罗汉|比丘|"
     r"戒律|禁律|法相|法眼|禪|禅|定|慧|"
     r"序品|序|卷|品|章|"
-    r"《[^》]{1,20}》|"  # sutra title in book quotes
+    r"《[^》]{1,20}》|"
     r"[\u4e00-\u9fff]{2,}經|[\u4e00-\u9fff]{1,3}經",
     re.I,
 )
 
 _COORD_CITE_RE = re.compile(r"【([A-Z]{1,3}\d+n\d+_[^】]+)】", re.I)
-# Trailing junk after valid p####[abc]## (e.g. p0195b14P -> p0195b14)
 _COORD_TAIL_RE = re.compile(
     r"^(T\d+n\d+_p\d+)([abc])(\d+)([^abc\d_].*)$",
     re.I,
@@ -97,12 +97,9 @@ def is_canon_question(question: str) -> bool:
         re.I,
     ):
         return True
-    # Short non-signal utterances (e.g. "hihi", "嗯") — not canon.
     if len(q) < 6 and not re.search(r"[\u4e00-\u9fff]{2,}", q):
         return False
-    # Longer text without any canon cue — treat as off-topic for this tool.
     return False
-
 
 
 class Tools:
@@ -152,4 +149,4 @@ class Tools:
         )
         r.raise_for_status()
         out = r.json().get("output", {})
-        return sanitize_citations(out.get("answer", ""))
+        return sanitize_citations(_sanitize_display_markdown(out.get("answer", "")))
