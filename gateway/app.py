@@ -86,6 +86,10 @@ class TaskRequest(BaseModel):
         description="model_admin JSON: action + optional container; see Gateway spec.",
     )
     client_request_id: str | None = Field(default=None, max_length=128)
+    survey_page: int = Field(default=1, ge=1, description="canon_survey: 1-based page.")
+    survey_page_size: int = Field(
+        default=15, ge=5, le=50, description="canon_survey: canons per page."
+    )
     audit_override: str | None = Field(
         default=None,
         description="H0|H1|H2; only honored for channel=internal and env allow list.",
@@ -960,7 +964,12 @@ def create_app() -> FastAPI:
             if not q:
                 raise HTTPException(status_code=400, detail="message required for canon_survey")
             with psycopg.connect(pg_retrieval.pg_dsn()) as conn:
-                report = survey_occurrences(conn, q)
+                report = survey_occurrences(
+                    conn,
+                    q,
+                    page=body.survey_page,
+                    page_size=body.survey_page_size,
+                )
             answer = format_survey_markdown(
                 report,
                 cbeta_url_fn=rag_retrieval.canon_id_to_cbeta_reader_url,
@@ -1198,6 +1207,55 @@ def create_app() -> FastAPI:
                 "retrieval_preview": preview,
                 "similar_sutra_links": similar_links,
             }
+
+            teaser_on = os.environ.get("VAJRA_RAG_SURVEY_TEASER", "1").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            if teaser_on and snippets and rag_status in (
+                "pg_hit",
+                "pg_hit_fast_d",
+                "pg_hit_hybrid_d",
+                "cache_hit",
+            ):
+                from canon.query.survey import (
+                    format_survey_teaser,
+                    primary_survey_keyword,
+                    survey_occurrences,
+                )
+
+                survey_kw = primary_survey_keyword(body.message)
+                if survey_kw:
+                    import psycopg
+
+                    teaser_page_size = int(os.environ.get("VAJRA_SURVEY_TEASER_CANONS", "5")) + 5
+
+                    def _teaser_sync() -> dict[str, Any]:
+                        with psycopg.connect(pg_retrieval.pg_dsn()) as conn:
+                            return survey_occurrences(
+                                conn,
+                                survey_kw,
+                                page=1,
+                                page_size=teaser_page_size,
+                            )
+
+                    try:
+                        teaser_report = await asyncio.to_thread(_teaser_sync)
+                        teaser = format_survey_teaser(
+                            teaser_report,
+                            cbeta_url_fn=rag_retrieval.canon_id_to_cbeta_reader_url,
+                        )
+                        if teaser:
+                            out["survey_teaser"] = teaser
+                            out["survey_keyword"] = survey_kw
+                            meta["survey_teaser"] = {
+                                "keyword": survey_kw,
+                                "total_canon_count": teaser_report.get("total_canon_count"),
+                            }
+                    except Exception as exc:
+                        logger.warning("survey teaser failed: %s", exc)
+
             if not verbose and isinstance(emb, dict):
                 slim = dict(emb)
                 data = slim.get("data")

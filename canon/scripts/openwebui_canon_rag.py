@@ -99,22 +99,30 @@ class Tools:
         data = r.json()
         out = data.get("output", {})
         answer = sanitize_citations(out.get("answer", ""))
+        teaser = out.get("survey_teaser", "")
         links = out.get("similar_sutra_links", [])
         link_txt = "\n".join(f"- [{x['label']}]({x['url']})" for x in links[:5])
-        body = f"{answer}\n\n**CBETA 連結**\n{link_txt}" if link_txt else answer
+        body = answer
+        if teaser:
+            body = f"{answer}{teaser}"
+        if link_txt:
+            body = f"{body}\n\n**CBETA 連結**\n{link_txt}"
         return sanitize_citations(body)
 
-    def list_tripitaka_occurrences(self, keyword: str) -> str:
-        """列出已匯入語料中含某關鍵詞的經典（全藏出處表，附 CBETA 連結）。"""
+    def list_tripitaka_occurrences(self, keyword: str, page: int = 1) -> str:
+        """列出已匯入語料中含某關鍵詞的經典（全藏出處表，附 CBETA 連結）。page 從 1 起算。"""
         kw = (keyword or "").strip()
         if not kw:
             return "請提供關鍵詞，例如：十二因緣、四諦、般若。"
+        page = max(1, int(page or 1))
         r = requests.post(
             f"{GATEWAY}/v1/task",
             json={
                 "mode": "canon_survey",
                 "channel": "web",
                 "message": kw,
+                "survey_page": page,
+                "survey_page_size": 15,
             },
             timeout=120,
         )
