@@ -1014,6 +1014,12 @@ def create_app() -> FastAPI:
 
             from canon.query.pipeline import embed_text, plan_query
             from canon.query.preprocess import preprocess_query
+            from canon.query.prompt_budget import (
+                estimate_tokens,
+                llm_input_token_budget,
+                truncate_chars,
+                truncate_to_token_budget,
+            )
             from canon.query.prompts import (
                 build_canon_d_hybrid_summary_prompt,
                 build_canon_synth_prompt,
@@ -1022,9 +1028,14 @@ def create_app() -> FastAPI:
                 synthesizer_system_message,
             )
 
-            pq = preprocess_query(body.message[:8192])
+            _max_msg = int(os.environ.get("VAJRA_MAX_USER_MESSAGE_CHARS", "4096"))
+            pq = preprocess_query(truncate_chars(body.message, _max_msg))
             query_plan = plan_query(pq)
-            embed_input = embed_text(pq, query_plan)[:8192]
+            _embed_tok = int(os.environ.get("VAJRA_EMBED_MAX_TOKENS", "2048"))
+            embed_input = truncate_to_token_budget(
+                embed_text(pq, query_plan),
+                _embed_tok,
+            )
 
             try:
                 emb = await embeddings_request(
@@ -1165,6 +1176,12 @@ def create_app() -> FastAPI:
                     sys_msg = synthesizer_system_message(query_type=query_plan.query_type)
                     max_tok = 1024 if query_plan.query_type == "D" else 2048
                 synth_temp = rag_retrieval.rag_synth_temperature(synth_profile)
+                _budget = llm_input_token_budget(reserve_output=max_tok)
+                _sys_tok = estimate_tokens(sys_msg)
+                synth_prompt = truncate_to_token_budget(
+                    synth_prompt,
+                    max(256, _budget - _sys_tok),
+                )
                 llm_summary, _ = await _llm_chat_completion(
                     http,
                     url=q["url"],

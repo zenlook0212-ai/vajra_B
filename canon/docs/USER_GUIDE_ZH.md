@@ -83,6 +83,20 @@
 | `VAJRA_RAG_D_SYNTH` | `hybrid` | `extractive` 全快摘錄；`llm` 全 LLM；`hybrid` 摘錄+綜述 |
 | `VAJRA_RAG_TOP_K` | `8` | 送入合成的檢索段數 |
 
+## Context 上限（8192 tokens）
+
+**qwen35b** vLLM 設為 `--max-model-len 8192`。時不時報錯 `input_tokens … 8193` 常見原因：
+
+| 原因 | 說明 |
+|------|------|
+| **同對話累積** | 多輪問答 + 工具回傳（長答案）塞滿 context |
+| **超長貼文** | 一次貼上整段經文或長問句 |
+| **合成 prompt** | 少數題 retrieval 段數多（已自動裁剪摘錄） |
+
+**建議**：佛典考據請 **開新對話**；長討論換新 thread。系統會自動裁剪舊訊息（WebUI patch）與 gateway 摘錄長度。
+
+管理員可調：`VAJRA_WEBUI_CTX_BUDGET=6800`、`VAJRA_MAX_USER_MESSAGE_CHARS=4096`。
+
 見 [`GOLDEN_SET.md`](../eval/GOLDEN_SET.md)、[`open-webui-canon-rag.md`](open-webui-canon-rag.md)。
 
 ---

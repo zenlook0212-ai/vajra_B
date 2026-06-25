@@ -17,6 +17,7 @@ MODELS = [
                 "chat_template_kwargs": {"enable_thinking": False},
                 "parallel_tool_calls": False,
             },
+            "max_tokens": 512,
             "system": (
                 "你是繁體中文佛典助理。禁止輸出 thinking process 等內部思考。"
                 "本模型僅回答佛經、大藏經、CBETA 考據。"

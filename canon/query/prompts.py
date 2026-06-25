@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
+
+from canon.query.prompt_budget import truncate_chars
+
+_SNIPPET_EXCERPT_MAX = int(os.environ.get("VAJRA_SYNTH_EXCERPT_CHARS", "360"))
 
 SYSTEM_PROMPT = """你是佛典研究助手。回答時必須引用原文，格式：
 【T01n0001_p0001a05】（大正藏坐標：卷冊頁欄行）
@@ -17,6 +22,10 @@ _NO_THINKING_RULES = (
 )
 
 
+def _snippet_excerpt(text: str) -> str:
+    return truncate_chars((text or "").strip(), _SNIPPET_EXCERPT_MAX)
+
+
 def build_canon_synth_prompt(user_message: str, snippets: list[dict[str, Any]]) -> str:
     blocks: list[str] = []
     for i, sn in enumerate(snippets, start=1):
@@ -24,7 +33,7 @@ def build_canon_synth_prompt(user_message: str, snippets: list[dict[str, Any]]) 
         coord = meta.get("coord_start") or meta.get("coord") or ""
         canon = meta.get("canon_id") or ""
         ref = f"【{coord}】({canon})" if coord else f"({canon})" if canon else ""
-        excerpt = sn.get("text", "")
+        excerpt = _snippet_excerpt(str(sn.get("text", "")))
         blocks.append(f"[片段{i}]{ref}\n{excerpt}")
 
     corpus = "\n\n---\n\n".join(blocks).strip()
@@ -45,7 +54,7 @@ def build_canon_synth_prompt_d_class(
         coord = meta.get("coord_start") or meta.get("coord") or ""
         canon = meta.get("canon_id") or ""
         ref = f"【{coord}】({canon})" if coord else f"({canon})" if canon else ""
-        excerpt = sn.get("text", "")
+        excerpt = _snippet_excerpt(str(sn.get("text", "")))
         blocks.append(f"[片段{i}]{ref}\n{excerpt}")
 
     corpus = "\n\n---\n\n".join(blocks).strip()
@@ -57,7 +66,8 @@ def build_canon_synth_prompt_d_class(
         "每面向用 2–3 句概括，句末標明所依坐標。\n"
         "2. 【綜合回答】整合以上面向，不超過 400 字；各要點後附坐標引用。\n"
         "3. 若不同經典觀點有差異，請如實指出；勿捏造未出現在片段中的內容。\n"
-        "4. 勿使用「根據以上段落」等空洞開場。"
+        "4. 不同譯本用字不同時，只述「用字不同、順序相近」，禁止寫「A 即 B」。\n"
+        "5. 勿使用「根據以上段落」等空洞開場。"
     )
 
 

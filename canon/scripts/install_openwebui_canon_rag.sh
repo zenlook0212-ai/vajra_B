@@ -38,6 +38,10 @@ echo "== patch Open WebUI Canon RAG passthrough (skip LLM round 2) =="
 docker cp "$SCRIPT_DIR/openwebui_patch_canon_passthrough.py" "$CONTAINER:/tmp/openwebui_patch_canon_passthrough.py"
 docker exec "$CONTAINER" python3 /tmp/openwebui_patch_canon_passthrough.py
 
+echo "== patch Open WebUI context trim (8192 ctx) =="
+docker cp "$SCRIPT_DIR/openwebui_patch_context_trim.py" "$CONTAINER:/tmp/openwebui_patch_context_trim.py"
+docker exec "$CONTAINER" python3 /tmp/openwebui_patch_context_trim.py
+
 echo "== configure qwen35b + qwen35b-thinking =="
 docker cp "$SCRIPT_DIR/openwebui_configure_qwen.py" "$CONTAINER:/tmp/openwebui_configure_qwen.py"
 docker exec "$CONTAINER" python3 /tmp/openwebui_configure_qwen.py
