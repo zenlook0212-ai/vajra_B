@@ -36,6 +36,30 @@ python -m canon.eval.run_eval --k 5 --report /opt/vajra/data/logs/canon_eval.jso
 
 报告含 `by_category`、`recall@5_AB_only`（经名+别名）、`recall@5_ABC_only`（不含开放 D 类）。
 
+## Phase 2A — 合成 / citation 品質
+
+對 **gateway 全鏈路** 評估回答中的 CBETA 坐標（超越 recall）：
+
+```bash
+export PYTHONPATH=/opt/vajra VAJRA_CANON_PG_DSN=postgresql://vajra:vajra@127.0.0.1:5433/canon
+
+# 煙測（5 題）
+python -m canon.eval.run_eval_synthesis --limit 5 \
+  --report /opt/vajra/data/logs/synthesis_smoke.json
+
+# 全量（約 15–30 分鐘，需 gateway + qwen35b）
+python -m canon.eval.run_eval_synthesis \
+  --report /opt/vajra/data/logs/synthesis_full.json
+```
+
+指標：
+
+| 指標 | 含義 | 目標 |
+|------|------|------|
+| `citation_valid_rate` | 答案中 `【T…】` 在 DB 存在 | ≥ 0.95 |
+| `citation_from_retrieval_rate` | 坐標來自本次 top-k 檢索片段 | ≥ 0.90 |
+| `pass_rate` | 有引用 + 全有效 + 全可追溯 + 無 thinking 洩漏 | — |
+
 ## 注意
 
 - v2 分数 **不可** 与 v1 legacy（50 题全绑 T01）直接比较。

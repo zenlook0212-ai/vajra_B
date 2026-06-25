@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,12 +13,12 @@ from typing import Any
 
 import psycopg
 
+from canon.eval.citation_metrics import citation_exists, normalize_citation_coord
 from canon.ingest.embed_client import embed_queries
 from canon.query.pipeline import embed_text, plan_query, retrieve_with_plan
 from canon.query.preprocess import normalize_canon_prefix, preprocess_query
 
-_COORD_CITE_RE = re.compile(r"【([A-Z]{1,3}\d+n\d+_[^】]+)】", re.I)
-DEFAULT_DSN = "postgresql://vajra:vajra@127.0.0.1:5433/canon"
+from canon.eval.citation_metrics import _COORD_CITE_RE
 
 
 def load_golden(path: Path) -> list[dict[str, Any]]:
@@ -131,25 +130,7 @@ def diagnose_item(
         },
     }
 
-
-def normalize_citation_coord(coord: str) -> str:
-    """Normalize golden-set cite to DB coord key (with trailing _)."""
-    c = coord.strip().rstrip("_")
-    return f"{c}_"
-
-
-def citation_exists(conn: psycopg.Connection, coord: str) -> bool:
-    cite = normalize_citation_coord(coord)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT 1 FROM canon_chunks
-            WHERE coord_start <= %s AND coord_end >= %s
-            LIMIT 1
-            """,
-            (cite, cite),
-        )
-        return cur.fetchone() is not None
+DEFAULT_DSN = "postgresql://vajra:vajra@127.0.0.1:5433/canon"
 
 
 def _mean(values: list[float]) -> float | None:
