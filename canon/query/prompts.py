@@ -71,7 +71,8 @@ def build_canon_d_hybrid_summary_prompt(user_message: str, aspects_body: str) ->
         "1. 整合上列面向，說明其義理關聯與差異（若有）。\n"
         "2. 可於句末引用上列已出現的坐標，格式【T…】；禁止新增上列未出現的坐標。\n"
         "3. 禁止重複輸出【義理面向】或逐字複製上列摘錄。\n"
-        "4. 勿輸出 thinking process；第一行直接以正文開始（可省略「【綜合回答】」標題）。"
+        "4. 勿輸出 thinking process；第一行直接以正文開始（可省略「【綜合回答】」標題）。\n"
+        "5. 勿使用 Markdown 格式（禁止 #、**、_、--- 等）；正文純繁體中文與【T…】坐標。"
     )
 
 

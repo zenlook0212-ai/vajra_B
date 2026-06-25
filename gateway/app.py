@@ -1201,6 +1201,10 @@ def create_app() -> FastAPI:
                     answer=answer,
                 )
 
+            from canon.query.display_sanitize import sanitize_display_markdown
+
+            answer = sanitize_display_markdown(answer)
+
             out: dict[str, Any] = {
                 "embedding_response": emb if verbose else {},
                 "answer": answer,

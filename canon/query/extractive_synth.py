@@ -6,6 +6,8 @@ import os
 import re
 from typing import Any
 
+from canon.query.display_sanitize import sanitize_display_markdown
+
 _ASPECT_LABELS: dict[str, str] = {
     "T01": "阿含／長部",
     "T02": "阿含經",
@@ -209,7 +211,7 @@ def sanitize_hybrid_summary(summary: str, aspects_body: str) -> str:
         key = _normalize_coord_key(match.group(1))
         return match.group(0) if key in allowed else ""
 
-    return _COORD_CITE_RE.sub(repl, summary or "")
+    return sanitize_display_markdown(_COORD_CITE_RE.sub(repl, summary or ""))
 
 
 def template_d_summary(user_message: str, aspects_body: str) -> str:
@@ -218,7 +220,8 @@ def template_d_summary(user_message: str, aspects_body: str) -> str:
 
 
 def assemble_hybrid_d_answer(aspects_body: str, summary: str) -> str:
-    return f"{aspects_body}\n\n【綜合回答】\n{summary.strip()}"
+    body = f"{aspects_body}\n\n【綜合回答】\n{summary.strip()}"
+    return sanitize_display_markdown(body)
 
 
 def fast_d_class_answer(

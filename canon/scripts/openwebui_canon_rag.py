@@ -7,6 +7,30 @@ import re
 
 import requests
 
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+_ITALIC_UNDERSCORE_RE = re.compile(r"(?<!\w)_(.+?)_(?!\w)", re.DOTALL)
+_ATX_HEADING_RE = re.compile(r"^#{1,6}\s+", re.MULTILINE)
+_HR_RE = re.compile(r"^\s*---+\s*$", re.MULTILINE)
+
+
+def _sanitize_display_markdown(text: str) -> str:
+    if not text:
+        return text
+    out = text
+    for _ in range(8):
+        nxt = _BOLD_RE.sub(r"\1", out)
+        if nxt == out:
+            break
+        out = nxt
+    for _ in range(8):
+        nxt = _ITALIC_UNDERSCORE_RE.sub(r"\1", out)
+        if nxt == out:
+            break
+        out = nxt
+    out = _ATX_HEADING_RE.sub("", out)
+    out = _HR_RE.sub("", out)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
+
 GATEWAY = os.environ.get("VAJRA_GATEWAY_URL", "http://127.0.0.1:8081")
 
 REFUSAL = "我是佛典助理，不閒聊。請問大藏經、CBETA 或某部經的內容／出處／義理。"
@@ -106,8 +130,8 @@ class Tools:
         if teaser:
             body = f"{answer}{teaser}"
         if link_txt:
-            body = f"{body}\n\n**CBETA 連結**\n{link_txt}"
-        return sanitize_citations(body)
+            body = f"{body}\n\n【CBETA 連結】\n{link_txt}"
+        return sanitize_citations(_sanitize_display_markdown(body))
 
     def list_tripitaka_occurrences(self, keyword: str, page: int = 1) -> str:
         """列出已匯入語料中含某關鍵詞的經典（全藏出處表，附 CBETA 連結）。page 從 1 起算。"""

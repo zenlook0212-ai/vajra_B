@@ -9,6 +9,7 @@ from typing import Any
 
 import psycopg
 
+from canon.query.display_sanitize import sanitize_display_markdown
 from canon.query.preprocess import TERM_MAP
 from canon.query.retrieval import bm25_search, keyword_search
 
@@ -160,8 +161,7 @@ def format_survey_teaser(
     show = groups[: max_canons or _SURVEY_TEASER_CANONS]
     lines = [
         "",
-        "---",
-        f"**還有哪些經提及「{kw}」**（語料內約 **{total_canons}** 部、**{total_hits}** 段）",
+        f"【還有哪些經提及「{kw}」】（語料內約 {total_canons} 部、{total_hits} 段）",
     ]
     for g in show:
         cid = g.get("canon_id", "")
@@ -173,10 +173,9 @@ def format_survey_teaser(
             lines.append(f"- {cid}（{n} 段）")
     if total_canons > len(show):
         lines.append(
-            f"- _另有 {total_canons - len(show)} 部經；完整列表請問："
-            f"「列出『{kw}』全藏出處」_"
+            f"（另有 {total_canons - len(show)} 部經；完整列表請問：「列出『{kw}』全藏出處」）"
         )
-    return "\n".join(lines)
+    return sanitize_display_markdown("\n".join(lines))
 
 
 def format_survey_markdown(
@@ -196,7 +195,7 @@ def format_survey_markdown(
 
     lines = [
         f"【全藏出處】「{q}」",
-        f"檢索詞：{'、'.join(terms)}；語料內共 **{total}** 段、**{total_canons}** 部經"
+        f"檢索詞：{'、'.join(terms)}；語料內共 {total} 段、{total_canons} 部經"
         f"（第 {page}/{total_pages} 頁，本頁 {n_canon} 部；已匯入 corpus；非 CBETA 官網全庫）。",
         "",
     ]
@@ -208,7 +207,7 @@ def format_survey_markdown(
         cid = g.get("canon_id", "")
         url = cbeta_url_fn(cid) if cbeta_url_fn else None
         label = f"[{cid}]({url})" if url else cid
-        lines.append(f"{i}. **{label}** — {g.get('hit_count', 0)} 段")
+        lines.append(f"{i}. {label} — {g.get('hit_count', 0)} 段")
         for s in g.get("samples") or []:
             coord = s.get("coord") or ""
             ex = s.get("excerpt") or ""
@@ -216,7 +215,7 @@ def format_survey_markdown(
         lines.append("")
 
     lines.append(
-        "_完整逐條索引請用 [CBETA Online](https://cbetaonline.dila.edu.tw/) 關鍵字搜尋；"
-        "本表僅含已匯入 pgvector 語料。_"
+        "完整逐條索引請用 [CBETA Online](https://cbetaonline.dila.edu.tw/) 關鍵字搜尋；"
+        "本表僅含已匯入 pgvector 語料。"
     )
-    return "\n".join(lines)
+    return sanitize_display_markdown("\n".join(lines))
