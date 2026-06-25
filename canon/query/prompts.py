@@ -61,6 +61,29 @@ def build_canon_synth_prompt_d_class(
     )
 
 
+def build_canon_d_hybrid_summary_prompt(user_message: str, aspects_body: str) -> str:
+    """LLM prompt: write only 【綜合回答】 from fixed extractive aspects."""
+    return (
+        f"使用者問題：\n{user_message.strip()}\n\n"
+        f"以下【義理面向】已由系統自檢索語料摘錄完成（含 CBETA 坐標），請勿改寫或重寫：\n\n"
+        f"{aspects_body.strip()}\n\n"
+        "請僅撰寫【綜合回答】（繁體中文，不超過 400 字）：\n"
+        "1. 整合上列面向，說明其義理關聯與差異（若有）。\n"
+        "2. 可於句末引用上列已出現的坐標，格式【T…】；禁止新增上列未出現的坐標。\n"
+        "3. 禁止重複輸出【義理面向】或逐字複製上列摘錄。\n"
+        "4. 勿輸出 thinking process；第一行直接以正文開始（可省略「【綜合回答】」標題）。"
+    )
+
+
+def hybrid_summary_system_message() -> str:
+    return (
+        SYSTEM_PROMPT
+        + "\n"
+        + _NO_THINKING_RULES
+        + "\n你僅負責撰寫【綜合回答】；義理面向摘錄已固定，不得修改。"
+    )
+
+
 def synthesizer_system_message(*, query_type: str = "A") -> str:
     base = SYSTEM_PROMPT + "\n" + _NO_THINKING_RULES
     if query_type == "D":

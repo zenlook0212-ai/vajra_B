@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -13,8 +14,9 @@ import psycopg
 CACHE_TTL_DAYS = int(os.environ.get("VAJRA_CANON_CACHE_TTL_DAYS", "7"))
 CACHE_THRESHOLD = float(os.environ.get("VAJRA_CANON_CACHE_COSINE", "0.95"))
 
-
-CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_a7_v1")
+# Bump when synthesis format changes (e.g. extractive cite suffix removal).
+CACHE_KEY_VERSION = os.environ.get("VAJRA_CANON_CACHE_KEY_VERSION", "phase_2c_v5")
+_OLD_CITE_SUFFIX_RE = re.compile(r"】\s*\([A-Z]{1,3}\d+n\d+", re.I)
 MIN_CACHE_CHUNKS = int(os.environ.get("VAJRA_CANON_CACHE_MIN_CHUNKS", "3"))
 
 
@@ -36,6 +38,18 @@ def _chunk_canon_id(chunk: dict[str, Any]) -> str:
     if chunk.get("canon_id"):
         return str(chunk["canon_id"]).upper()
     return ""
+
+
+def is_stale_cached_answer(answer: str) -> bool:
+    """Reject cached answers from older synthesis formats or incomplete D-class output."""
+    text = (answer or "").strip()
+    if not text:
+        return True
+    if _OLD_CITE_SUFFIX_RE.search(text):
+        return True
+    if "【義理面向】" in text and "【綜合回答】" not in text:
+        return True
+    return False
 
 
 def cache_matches_scope(
@@ -90,10 +104,13 @@ def lookup_cache(
         return None
     if not cache_matches_scope(top_chunks, canon_prefixes):
         return None
+    answer = str(row[2] or "")
+    if is_stale_cached_answer(answer):
+        return None
     return {
         "query_hash": row[0],
         "top_chunks": top_chunks,
-        "answer": row[2],
+        "answer": answer,
         "cosine": cosine,
     }
 
@@ -121,6 +138,20 @@ def store_cache(
             (qh, emb_lit, json.dumps(top_chunks, ensure_ascii=False), answer),
         )
     conn.commit()
+
+
+def purge_stale_cache(conn: psycopg.Connection) -> int:
+    """Delete cached answers that fail is_stale_cached_answer."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT query_hash, answer FROM semantic_cache")
+        rows = cur.fetchall()
+    stale = [h for h, a in rows if is_stale_cached_answer(str(a or ""))]
+    if not stale:
+        return 0
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM semantic_cache WHERE query_hash = ANY(%s)", (stale,))
+    conn.commit()
+    return len(stale)
 
 
 def purge_expired(conn: psycopg.Connection) -> int:

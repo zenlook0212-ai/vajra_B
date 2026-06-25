@@ -42,6 +42,11 @@ echo "== configure qwen35b + qwen35b-thinking =="
 docker cp "$SCRIPT_DIR/openwebui_configure_qwen.py" "$CONTAINER:/tmp/openwebui_configure_qwen.py"
 docker exec "$CONTAINER" python3 /tmp/openwebui_configure_qwen.py
 
+echo "== install Canon RAG outlet guard (global filter) =="
+docker cp "$SCRIPT_DIR/openwebui_canon_rag_filter.py" "$CONTAINER:/tmp/openwebui_canon_rag_filter.py"
+docker cp "$SCRIPT_DIR/openwebui_install_filter.py" "$CONTAINER:/tmp/openwebui_install_filter.py"
+docker exec "$CONTAINER" python3 /tmp/openwebui_install_filter.py
+
 echo "== smoke from container =="
 docker exec "$CONTAINER" curl -sf -m 30 "${GATEWAY_URL}/v1/modes" | head -c 120
 echo

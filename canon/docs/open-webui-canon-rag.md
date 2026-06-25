@@ -58,3 +58,7 @@ class Tools:
 ```
 
 見 [`canon/scripts/weekly_eval.sh`](canon/scripts/weekly_eval.sh)。
+
+## 使用者指南
+
+何時用佛典 RAG、何時用 CBETA 線上搜尋：[`USER_GUIDE_ZH.md`](USER_GUIDE_ZH.md)。

@@ -28,7 +28,7 @@ _CANON_SIGNAL_RE = re.compile(
     r"CBETA|cbeta|大藏|大正|T\d{2}|"
     r"佛經|佛经|佛典|藏經|藏经|經文|经藏|律藏|論藏|论藏|契經|"
     r"阿含|般若|金剛|金刚|楞嚴|楞严|華嚴|华严|法華|法华|"
-    r"唯識|唯识|八識|八识|四諦|四谛|八正道|十二因緣|十二因缘|"
+    r"唯識|唯识|八識|八识|四諦|四谛|八正道|十二因緣|十二因缘|十二有支|十二緣起|緣起|因緣|"
     r"涅槃|菩薩|菩萨|如來|如来|羅漢|罗汉|比丘|"
     r"戒律|禁律|法相|法眼|禪|禅|定|慧|"
     r"序品|序|卷|品|章|"
@@ -67,11 +67,18 @@ def is_canon_question(question: str) -> bool:
         return False
     if _CANON_SIGNAL_RE.search(q):
         return True
+    if re.match(
+        r"^(?:十二因緣|十二因缘|十二有支|十二緣起|四諦|四谛|八正道|緣起|因緣)$",
+        q,
+        re.I,
+    ):
+        return True
     # Short non-signal utterances (e.g. "hihi", "嗯") — not canon.
     if len(q) < 6 and not re.search(r"[\u4e00-\u9fff]{2,}", q):
         return False
     # Longer text without any canon cue — treat as off-topic for this tool.
     return False
+
 
 
 class Tools:
@@ -96,3 +103,21 @@ class Tools:
         link_txt = "\n".join(f"- [{x['label']}]({x['url']})" for x in links[:5])
         body = f"{answer}\n\n**CBETA 連結**\n{link_txt}" if link_txt else answer
         return sanitize_citations(body)
+
+    def list_tripitaka_occurrences(self, keyword: str) -> str:
+        """列出已匯入語料中含某關鍵詞的經典（全藏出處表，附 CBETA 連結）。"""
+        kw = (keyword or "").strip()
+        if not kw:
+            return "請提供關鍵詞，例如：十二因緣、四諦、般若。"
+        r = requests.post(
+            f"{GATEWAY}/v1/task",
+            json={
+                "mode": "canon_survey",
+                "channel": "web",
+                "message": kw,
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        out = r.json().get("output", {})
+        return sanitize_citations(out.get("answer", ""))

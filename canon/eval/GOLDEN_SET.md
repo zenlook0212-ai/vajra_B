@@ -78,7 +78,13 @@ python -m canon.eval.run_eval_synthesis --limit 5 --faithfulness-llm \
 |------|------|----------|
 | `faithfulness` | 回答斷言被檢索片段支撐的比例 | ≥ 0.75（`--faithfulness-min`） |
 
-`pass` 現亦要求 `faithfulness` 達標。
+`pass` 現亦要求 `faithfulness` 達標。全修後（2026-06）基線約 **pass_rate 93%**；`pass_kind` 為 `cited` 或 `conservative_refusal`。
+
+### 語意快取
+
+Gateway 使用 `semantic_cache`；合成格式變更時請 bump `VAJRA_CANON_CACHE_KEY_VERSION`（預設 `phase_2c_v5`）。
+
+D 類合成 `VAJRA_RAG_D_SYNTH`：`hybrid`（預設，摘錄+LLM綜合）| `extractive`（全快）| `llm`（全LLM）。
 
 ## 注意
 

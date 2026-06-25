@@ -52,6 +52,7 @@ class TaskMode(str, Enum):
     ocr = "ocr"
     deep_think = "deep_think"
     canon_rag = "canon_rag"
+    canon_survey = "canon_survey"
     chat = "chat"
     model_admin = "model_admin"
 
@@ -946,6 +947,48 @@ def create_app() -> FastAPI:
                 meta=meta,
             )
 
+        if body.mode == TaskMode.canon_survey:
+            if not pg_retrieval.pg_configured():
+                raise HTTPException(
+                    status_code=503,
+                    detail="VAJRA_CANON_PG_DSN required for canon_survey",
+                )
+            import psycopg
+            from canon.query.survey import format_survey_markdown, survey_occurrences
+
+            q = (body.message or "").strip()
+            if not q:
+                raise HTTPException(status_code=400, detail="message required for canon_survey")
+            with psycopg.connect(pg_retrieval.pg_dsn()) as conn:
+                report = survey_occurrences(conn, q)
+            answer = format_survey_markdown(
+                report,
+                cbeta_url_fn=rag_retrieval.canon_id_to_cbeta_reader_url,
+            )
+            meta["canon_survey"] = {
+                "total_hits": report.get("total_hits"),
+                "canon_count": report.get("canon_count"),
+                "terms_searched": report.get("terms_searched"),
+            }
+            return TaskResponse(
+                mode=body.mode,
+                channel=body.channel,
+                audit_level=audit_level,
+                output={
+                    "answer": answer,
+                    "survey": report,
+                    "similar_sutra_links": [
+                        {
+                            "label": g["canon_id"],
+                            "url": rag_retrieval.canon_id_to_cbeta_reader_url(g["canon_id"]),
+                        }
+                        for g in (report.get("groups") or [])
+                        if rag_retrieval.canon_id_to_cbeta_reader_url(g.get("canon_id", ""))
+                    ],
+                },
+                meta=meta,
+            )
+
         if body.mode == TaskMode.canon_rag:
             qe = eps.get("qwen_embed") or eps.get("nemotron_embed")
             q = eps.get("qwen")
@@ -963,8 +1006,10 @@ def create_app() -> FastAPI:
             from canon.query.pipeline import embed_text, plan_query
             from canon.query.preprocess import preprocess_query
             from canon.query.prompts import (
+                build_canon_d_hybrid_summary_prompt,
                 build_canon_synth_prompt,
                 build_canon_synth_prompt_d_class,
+                hybrid_summary_system_message,
                 synthesizer_system_message,
             )
 
@@ -1007,6 +1052,8 @@ def create_app() -> FastAPI:
 
             answer: str = ""
             synth_prompt: str = ""
+            d_hybrid_aspects_body: str | None = None
+            synth_use_hybrid_summary = False
 
             if cached_answer and snippets:
                 rag_status = "cache_hit"
@@ -1014,15 +1061,37 @@ def create_app() -> FastAPI:
             elif snippets:
                 k_prompt = rag_retrieval.rag_top_k()
                 for_llm = snippets[:k_prompt]
-                from canon.query.extractive_synth import fast_d_class_answer, use_fast_d_synth
+                from canon.query.extractive_synth import (
+                    assemble_hybrid_d_answer,
+                    build_d_class_aspects,
+                    d_synth_mode,
+                    fast_d_class_answer,
+                    format_d_aspects_body,
+                    parse_hybrid_summary_text,
+                    sanitize_hybrid_summary,
+                    template_d_summary,
+                )
 
                 fast_answer: str | None = None
-                if query_plan.query_type == "D" and use_fast_d_synth():
-                    fast_answer = fast_d_class_answer(body.message, for_llm)
+                if query_plan.query_type == "D":
+                    d_mode = d_synth_mode()
+                    if d_mode == "extractive":
+                        fast_answer = fast_d_class_answer(body.message, for_llm)
+                    elif d_mode == "hybrid":
+                        aspects = build_d_class_aspects(for_llm)
+                        if aspects:
+                            d_hybrid_aspects_body = format_d_aspects_body(aspects)
+                            synth_prompt = build_canon_d_hybrid_summary_prompt(
+                                body.message, d_hybrid_aspects_body
+                            )
+                            synth_use_hybrid_summary = True
+                            rag_status = "pg_hit_hybrid_d"
+                    # d_mode == "llm" falls through to full d_class prompt below
+
                 if fast_answer:
                     rag_status = "pg_hit_fast_d"
                     answer = fast_answer
-                else:
+                elif not synth_use_hybrid_summary:
                     if query_plan.query_type == "D":
                         synth_prompt = build_canon_synth_prompt_d_class(
                             body.message, for_llm
@@ -1063,11 +1132,12 @@ def create_app() -> FastAPI:
             synth_profile = rag_retrieval.rag_synth_profile(body.message)
             synth_kind = "standard"
             if query_plan.query_type == "D":
-                synth_kind = (
-                    "d_extractive"
-                    if rag_status == "pg_hit_fast_d"
-                    else "d_structured"
-                )
+                if rag_status == "pg_hit_fast_d":
+                    synth_kind = "d_extractive"
+                elif rag_status == "pg_hit_hybrid_d":
+                    synth_kind = "d_hybrid"
+                else:
+                    synth_kind = "d_structured"
             meta["rag"] = {
                 "backend": "pgvector",
                 "query_intent": pq.intent,
@@ -1079,10 +1149,14 @@ def create_app() -> FastAPI:
             }
 
             if not answer:
-                sys_msg = synthesizer_system_message(query_type=query_plan.query_type)
+                if synth_use_hybrid_summary and d_hybrid_aspects_body:
+                    sys_msg = hybrid_summary_system_message()
+                    max_tok = 512
+                else:
+                    sys_msg = synthesizer_system_message(query_type=query_plan.query_type)
+                    max_tok = 1024 if query_plan.query_type == "D" else 2048
                 synth_temp = rag_retrieval.rag_synth_temperature(synth_profile)
-                max_tok = 1024 if query_plan.query_type == "D" else 2048
-                answer, _ = await _llm_chat_completion(
+                llm_summary, _ = await _llm_chat_completion(
                     http,
                     url=q["url"],
                     model_id=q["model_id"],
@@ -1094,8 +1168,22 @@ def create_app() -> FastAPI:
                     temperature=synth_temp,
                     extra_body={"chat_template_kwargs": {"enable_thinking": False}},
                 )
+                if synth_use_hybrid_summary and d_hybrid_aspects_body:
+                    summary = sanitize_hybrid_summary(
+                        parse_hybrid_summary_text(llm_summary),
+                        d_hybrid_aspects_body,
+                    )
+                    if not summary.strip():
+                        summary = template_d_summary(body.message, d_hybrid_aspects_body)
+                    answer = assemble_hybrid_d_answer(d_hybrid_aspects_body, summary)
+                else:
+                    answer = llm_summary
 
-            if vec and snippets and rag_status in ("pg_hit", "pg_hit_fast_d"):
+            if vec and snippets and rag_status in (
+                "pg_hit",
+                "pg_hit_fast_d",
+                "pg_hit_hybrid_d",
+            ):
                 await asyncio.to_thread(
                     pg_retrieval.store_answer_cache,
                     pq=pq,

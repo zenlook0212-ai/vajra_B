@@ -35,3 +35,4 @@ export VAJRA_HERMES_CANON_RAG=on_demand
 - Re-embed passages (after query/passage split): `canon/scripts/re_embed_all.sh`
 - W4 verify: `canon/scripts/verify_e2e.sh`
 - Weekly eval: `canon/scripts/install_weekly_eval_cron.sh`
+- **使用者指南（RAG vs CBETA）**: [`canon/docs/USER_GUIDE_ZH.md`](docs/USER_GUIDE_ZH.md)
